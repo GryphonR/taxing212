@@ -1,21 +1,5 @@
-// console.log("Working");
-//
-// var fileInput = document.getElementById("csv"),
-//
-//   readFile = function() {
-//     var reader = new FileReader();
-//     reader.onload = function() {
-//       document.getElementById('out').innerHTML = reader.result;
-//     };
-//     // start reading the file. When it is done, calls the onload event defined above.
-//     reader.readAsBinaryString(fileInput.files[0]);
-//   };
-//
-// fileInput.addEventListener('change', readFile);
-
-
 Vue.config.productionTip = false;
-Vue.config.devtools = false;
+// Vue.config.devtools = false;
 
 var assetPrototype = {
 
@@ -58,7 +42,7 @@ const app = new Vue({
             }
           }
           console.log(`Calling calculate Disposals`);
-          // t.calculateLedger();
+          t.calculateLedger();
           // t.calculateDisposals();
 
 
@@ -116,7 +100,7 @@ const app = new Vue({
         value: trade[10],
         // isin: trade[2],
         number: Number(trade[5]),
-        price: trade[6],
+        price: Number(trade[6]),
         currency: trade[7],
         exchangeRate: trade[8],
         result: Number(trade[9]),
@@ -198,7 +182,7 @@ const app = new Vue({
           if (holding.ledger.length == 0) {
             temp.total = temp.change;
           } else {
-            temp.total = holding.ledger[holding.ledger.length - 1] + temp.change;
+            temp.total = Number(holding.ledger[holding.ledger.length - 1].total) + temp.change;
           }
           holding.ledger.push(temp);
           // console.log(`Adding to ${holding.ticker} ledger: ${JSON.stringify(temp)}`);

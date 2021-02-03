@@ -29,11 +29,11 @@
         <strong>{{inst.name}}</strong> ({{inst.ticker}}), Disposals: {{inst.disposalCount}}, P/L: {{inst.realisedPl}}
         <div class="disposal-container">
           <p>Trades:</p>
-          Number of Trades: {{inst.trades.length}}
+          <!-- Number of Trades: {{inst.trades.length}} -->
           <template v-for="t in inst.trades">
-            {{JSON.stringify(t)}}
-            <div class="disposal">
-              <!-- <p> T:{{Date(d.timestamp).toString().slice(0,10)}}, H:{{d.change}}, P:£{{d.price}}, Total{{d.total}}</p> -->
+            <!-- {{JSON.stringify(t)}} -->
+            <div class="trade-row">
+              <p>{{new Date(t.timestamp).toString().slice(0,10)}}: {{t.rawType}} {{t.number}} {{t.number > 1? "Shares":"Share"}} @ {{t.price.toFixed(2)}}{{t.currency}}. Total £{{t.total.toFixed(2)}}</p>
             </div>
           </template>
         </div>
@@ -41,20 +41,12 @@
           <p>Ledger:</p>
           Ledger Length: {{inst.ledger.length}}
           <template v-for="d in inst.ledger">
-            {{JSON.stringify(d)}}
-            <div class="disposal">
-              <!-- <p> T:{{Date(d.timestamp).toString().slice(0,10)}}, H:{{d.change}}, P:£{{d.price}}, Total{{d.total}}</p> -->
+            <!-- {{JSON.stringify(d)}} -->
+            <div class="trade-row">
+              <p> T:{{new Date(d.timestamp).toString().slice(0,10)}}, H:{{d.change}}, P:£{{d.price}}, Total{{d.total}}</p>
             </div>
           </template>
         </div>
-        <!-- <div class="disposal-container">
-          <p>Disposals:</p>
-          <template v-for="d in inst.disposals">
-            <div class="disposal">
-              <p> DISPOSAL: £{{d.pl}}</p>
-            </div>
-          </template>
-        </div> -->
       </div>
     </template>
 
@@ -64,6 +56,5 @@
   </div>
 </body>
 
-<script type='text/javascript' src="scripts/script.js"></script>
-
 </html>
+<script type='text/javascript' src="Scripts/script.js"></script>
