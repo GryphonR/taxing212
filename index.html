@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+
+<head>
+  <meta charset="utf-8">
+  <title></title>
+  <link rel='stylesheet' href='Styles/style.css' />
+  <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+  <!-- <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script> -->
+  <script src="Scripts/papaparse.min.js"></script>
+</head>
+
+<body>
+  <h1>Calc</h1>
+  <!--
+  <input id="csv" type="file">
+
+  <output id="out">
+      file contents will appear here
+  </output> -->
+
+  <div id="app">
+
+    <input type="file" ref="myFile" @change="selectedFile"><br />
+    <h1> </h1>
+    £{{purchaseValue.toFixed(2)}}, Realised Profit: {{totalRealisedPl.toFixed(2)}}
+    <template v-for="inst in holdings">
+      <div class="holding">
+        <strong>{{inst.name}}</strong> ({{inst.ticker}}), Disposals: {{inst.disposalCount}}, P/L: {{inst.realisedPl}}
+        <div class="disposal-container">
+          <p>Trades:</p>
+          Number of Trades: {{inst.trades.length}}
+          <template v-for="t in inst.trades">
+            {{JSON.stringify(t)}}
+            <div class="disposal">
+              <!-- <p> T:{{Date(d.timestamp).toString().slice(0,10)}}, H:{{d.change}}, P:£{{d.price}}, Total{{d.total}}</p> -->
+            </div>
+          </template>
+        </div>
+        <div class="disposal-container">
+          <p>Ledger:</p>
+          Ledger Length: {{inst.ledger.length}}
+          <template v-for="d in inst.ledger">
+            {{JSON.stringify(d)}}
+            <div class="disposal">
+              <!-- <p> T:{{Date(d.timestamp).toString().slice(0,10)}}, H:{{d.change}}, P:£{{d.price}}, Total{{d.total}}</p> -->
+            </div>
+          </template>
+        </div>
+        <!-- <div class="disposal-container">
+          <p>Disposals:</p>
+          <template v-for="d in inst.disposals">
+            <div class="disposal">
+              <p> DISPOSAL: £{{d.pl}}</p>
+            </div>
+          </template>
+        </div> -->
+      </div>
+    </template>
+
+
+
+
+  </div>
+</body>
+
+<script type='text/javascript' src="scripts/script.js"></script>
+
+</html>
