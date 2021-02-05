@@ -42,8 +42,8 @@ const app = new Vue({
             }
           }
           console.log(`Calling calculate Disposals`);
-          t.calculateLedger();
-          // t.calculateDisposals();
+          t.populateLedger();
+          t.calculateDisposals();
 
 
           // console.log(JSON.stringify(this.holdings));
@@ -157,7 +157,7 @@ const app = new Vue({
       }
 
     },
-    calculateLedger() {
+    populateLedger() {
       // Create an individual ledger for each holding.
 
       // Ledger Prototype:
@@ -165,19 +165,25 @@ const app = new Vue({
         timestamp: 0,
         change: 0,
         price: 0,
-        total: 0,
+        currency: "",
+        exchangeRate: 0,
+        totalGBP: 0,
+        feesPaid: 0,
+        costBasis: 0,
         txid: 0
       }
 
       for (key in this.holdings) { // For each holding
         var holding = this.holdings[key];
         // console.log(`Ledger holding: ${JSON.stringify(holding)}`);
-        console.log(`Num Trades: ${holding.trades.length}`);
+        // console.log(`Num Trades: ${holding.trades.length}`);
+
         for (tradeKey in holding.trades) { // for each trade
           var t = holding.trades[tradeKey];
           let temp = Object.create(ledgerProto);
           temp.timestamp = t.timestamp;
-          temp.change = t.rawType === "BUY" ? t.number : -t.number;
+          temp.change = t.rawType == "Buy" ? t.number : -t.number;
+          // console.log(`Type = ${t.rawType}, buy = ${t.rawType == "BUY"}`);
           temp.price = t.price;
           if (holding.ledger.length == 0) {
             temp.total = temp.change;
@@ -187,7 +193,7 @@ const app = new Vue({
           holding.ledger.push(temp);
           // console.log(`Adding to ${holding.ticker} ledger: ${JSON.stringify(temp)}`);
         }
-        console.log(`Num Ledger Entries: ${holding.ledger.length}`);
+        // console.log(`Num Ledger Entries: ${holding.ledger.length}`);
 
       }
 
@@ -197,72 +203,69 @@ const app = new Vue({
 
       for (key in this.holdings) {
         var holding = this.holdings[key];
+        console.log(JSON.stringify(holding));
         if (holding.disposalCount) {
-          //IF there are any disposals, lets to the maths.
-          let firstBuyDate = 0;
-          let holdings = 0;
-          let costBasis = 0;
-          let averagePrice = 0;
-          let pl = 0;
-          let lastBuy = {
-            cost: 0,
-            date: 0,
-            amount: 0
-          };
-          let tempDateBought = 0;
-          for (tradeKey in holding.trades) {
-            var t = holding.trades[tradeKey];
 
-            // Step through trades in chronological order and calculate gains per disposal
-            console.log(`Trade Type = ${t.rawType}`);
-            if (t.rawType == "Buy") {
-              console.log(`Bought ${holding.ticker}`);
-              //Check if first buy since low holdings
-              if (holdings < 0.1) { // TAking into account a closed position with some stock dust left over - i.e. non zero but negligable balance
-                firstBuyDate = t.timestamp;
-              }
-              holdings += t.number;
-              costBasis += t.total;
-              averagePrice = (holding / costBasis);
-              lastBuy.cost = t.total;
-              lastBuy.date = t.timestamp;
-              lastBuy.amount = t.number;
-            } else { //sell
-              console.log(`Disposal:sell`);
-              // todo - check that more have been bought than sold. i.e. is history complete?
-              //Is this a BnB(30day) trade?
-              let thirtyDaysMs = 2592000000; //1000*60*60*24*30;
-              if (t.timestamp - lastBuy.date > thirtyDaysMs) { //This is a BnB desposal
-                console.log(`BnB Disposal`);
-                console.log(`Bought ${lastBuy.ammount} on ${lastBuy.date}`);
-                console.log(`Sold ${t.number} on ${t.timestamp}`);
-                if (t.number <= lastBuy.amount) { //Sold as much as or less than bnb purchase
-                  pl = (lastBuy.amount * lastBuy.cost) - (t.number * t.price);
-                  tempDateBought = lastBuy.date;
-                } else { //Part of the trade is counted as bnb, part as average cost
-                  console.log(`Part BnB Disposal`);
-                  let outstanding = t.total - lastBuy.amount;
-                  let temppl = lastBuy.amount * lastBuy.cost - t.number - t.total
-                  pl = temppl + ((outstanding * t.price) - (outstanding * averagePrice))
-                }
-              } else { //use cost average
-                console.log(`Average Pool Disposal`);
-                console.log(`${t.number},${t.price},${t.number}, ${averagePrice}`);
-                pl = ((t.number * t.price) - (t.number * averagePrice))
-              }
-              console.log(`P/L = ${pl}`);
-              console.log(`${holding.ticker} PL Calculated as ${pl}`);
-              holding.realisedPl += pl;
-              disposal = {
-                dateSold: t.timestamp,
-                dateBought: tempDateBought, //// TODO:
-                cost: 0,
-                pl: pl,
-                calculationMethod: ""
-              }
+          // for (tradeKey in holding.ledger) {
+          var i;
+          for (i = holding.ledger.length - 1; i >= 0; i--) { //Step through Ledger in reverse
+            var l = holding.ledger[i];
+            console.log(JSON.stringify(l));
 
-              holding.disposals.push(disposal);
+            //is it a disposal?
+            if (l.change < 0) { //if change is negative it's a sell.
+              console.log(`Sold Something`);
             }
+
+            // // Step through trades in chronological order and calculate gains per disposal
+            // console.log(`Trade Type = ${t.rawType}`);
+            // if (t.rawType == "Buy") {
+            //   console.log(`Bought ${holding.ticker}`);
+            //   //Check if first buy since low holdings
+            //   if (holdings < 0.1) { // TAking into account a closed position with some stock dust left over - i.e. non zero but negligable balance
+            //     firstBuyDate = t.timestamp;
+            //   }
+            //   holdings += t.number;
+            //   costBasis += t.total;
+            //   averagePrice = (holding / costBasis);
+            //   lastBuy.cost = t.total;
+            //   lastBuy.date = t.timestamp;
+            //   lastBuy.amount = t.number;
+            // } else { //sell
+            //   console.log(`Disposal:sell`);
+            //   // todo - check that more have been bought than sold. i.e. is history complete?
+            //   //Is this a BnB(30day) trade?
+            //   let thirtyDaysMs = 2592000000; //1000*60*60*24*30;
+            //   if (t.timestamp - lastBuy.date > thirtyDaysMs) { //This is a BnB desposal
+            //     console.log(`BnB Disposal`);
+            //     console.log(`Bought ${lastBuy.ammount} on ${lastBuy.date}`);
+            //     console.log(`Sold ${t.number} on ${t.timestamp}`);
+            //     if (t.number <= lastBuy.amount) { //Sold as much as or less than bnb purchase
+            //       pl = (lastBuy.amount * lastBuy.cost) - (t.number * t.price);
+            //       tempDateBought = lastBuy.date;
+            //     } else { //Part of the trade is counted as bnb, part as average cost
+            //       console.log(`Part BnB Disposal`);
+            //       let outstanding = t.total - lastBuy.amount;
+            //       let temppl = lastBuy.amount * lastBuy.cost - t.number - t.total
+            //       pl = temppl + ((outstanding * t.price) - (outstanding * averagePrice))
+            //     }
+            //   } else { //use cost average
+            //     console.log(`Average Pool Disposal`);
+            //     console.log(`${t.number},${t.price},${t.number}, ${averagePrice}`);
+            //     pl = ((t.number * t.price) - (t.number * averagePrice))
+            //   }
+            //   console.log(`P/L = ${pl}`);
+            //   console.log(`${holding.ticker} PL Calculated as ${pl}`);
+            //   holding.realisedPl += pl;
+            //   disposal = {
+            //     dateSold: t.timestamp,
+            //     dateBought: tempDateBought, //// TODO:
+            //     cost: 0,
+            //     pl: pl,
+            //     calculationMethod: ""
+            //   }
+            //
+            //   holding.disposals.push(disposal);
           }
         }
       }

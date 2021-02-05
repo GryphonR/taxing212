@@ -31,7 +31,7 @@
           <p>Trades:</p>
           <!-- Number of Trades: {{inst.trades.length}} -->
           <template v-for="t in inst.trades">
-            <!-- {{JSON.stringify(t)}} -->
+            <!-- {{JSON.stringify(t)}}€€ -->
             <div class="trade-row">
               <p>{{new Date(t.timestamp).toString().slice(0,10)}}: {{t.rawType}} {{t.number}} {{t.number > 1? "Shares":"Share"}} @ {{t.price.toFixed(2)}}{{t.currency}}. Total £{{t.total.toFixed(2)}}</p>
             </div>
@@ -43,7 +43,7 @@
           <template v-for="d in inst.ledger">
             <!-- {{JSON.stringify(d)}} -->
             <div class="trade-row">
-              <p> T:{{new Date(d.timestamp).toString().slice(0,10)}}, H:{{d.change}}, P:£{{d.price}}, Total{{d.total}}</p>
+              <p> {{new Date(d.timestamp).toString().slice(0,10)}}, Change: {{d.change.toFixed(2)}}, {{d.price.toFixed(2)}}p, Total: {{d.total.toFixed(2)}}</p>
             </div>
           </template>
         </div>
