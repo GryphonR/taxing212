@@ -22,18 +22,45 @@
   <div id="app">
 
     <input type="file" ref="myFile" @change="selectedFile"><br />
-    <h1> </h1>
+    <h1 v-if="calculating"> Calculating - {{message}} </h1>
     £{{purchaseValue.toFixed(2)}}, Realised Profit: {{totalRealisedPl.toFixed(2)}}
+    
+    <h2> Deposits </h2>
+    <template v-for="dep in deposits">
+      <div class="holding">
+        {{dep.dateString}}: £{{dep.value}}
+      </div>
+    </template>
+
+
+    <h2> Withdrawals </h2>
+    <template v-for="itm in withdrawals">
+      <div class="holding">
+        {{itm.dateString}}: £{{itm.value}}
+      </div>
+    </template>
+
+    <h2> Dividends </h2>
+    <template v-for="itm in dividends">
+      <div class="holding">
+        {{itm.dateString}}, {{itm.name}}({{itm.ticker}}) £{{itm.value}}
+      </div>
+    </template>
+
+
+    <h2> Trades </h2>
     <template v-for="inst in holdings">
       <div class="holding">
-        <strong>{{inst.name}}</strong> ({{inst.ticker}}), Disposals: {{inst.disposalCount}}, P/L: {{inst.realisedPl}}
+        <div class="holding-title"><strong>{{inst.name}}</strong></div> ({{inst.ticker}}), Disposals:
+        {{inst.disposalCount}}, P/L: {{inst.realisedPl}}
         <div class="disposal-container">
           <p>Trades:</p>
           <!-- Number of Trades: {{inst.trades.length}} -->
-          <template v-for="t in inst.trades">
+          <template v-for="t,key in inst.trades">
             <!-- {{JSON.stringify(t)}}€€ -->
-            <div class="trade-row">
-              <p>{{new Date(t.timestamp).toString().slice(0,10)}}: {{t.rawType}} {{t.number}} {{t.number > 1? "Shares":"Share"}} @ {{t.price.toFixed(2)}}{{t.currency}}. Total £{{t.total.toFixed(2)}}</p>
+            <div v-bind:class="getTradeClass(t.rawType)">
+              <p>ID:{{key}} {{new Date(t.timestamp).toString().slice(0,10)}}: {{t.rawType}} {{t.number}} {{t.number > 1?
+                "Shares":"Share"}} @ {{t.price.toFixed(2)}}{{t.currency}}. Total £{{t.total.toFixed(2)}}</p>
             </div>
           </template>
         </div>
@@ -43,10 +70,12 @@
           <template v-for="d in inst.ledger">
             <!-- {{JSON.stringify(d)}} -->
             <div class="trade-row">
-              <p> {{new Date(d.timestamp).toString().slice(0,10)}}, Change: {{d.change.toFixed(2)}}, {{d.price.toFixed(2)}}p, Total: {{d.total.toFixed(2)}}</p>
+              <p> {{new Date(d.timestamp).toString().slice(0,10)}}, Change: {{d.change.toFixed(2)}},
+                {{d.price.toFixed(2)}}p, Total: {{d.total.toFixed(2)}}</p>
             </div>
           </template>
         </div>
+        <div class="position-status-container"></div>
       </div>
     </template>
 

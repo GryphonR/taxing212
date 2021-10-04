@@ -1,0 +1,11 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "pwa-chrome",
+            "request": "launch",
+            "name": "Debug Taxing212",
+            "url": "http://127.0.0.1:8000"
+        }
+    ]
+}

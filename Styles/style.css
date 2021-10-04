@@ -1,14 +1,41 @@
+body{
+  background-color: F5F5F5;
+}
+
 .holding{
   background-color: #f9f9f9;
   border-radius: 5px;
-  margin: 5px auto;
+  margin: 15px auto;
   padding: 3px 20px;
   width: 90vw;
+}
+
+.holding-title{
+  margin-top: 10px;
+  padding-bottom: 3px;
+  font-size: large;
+  border-bottom: 2px black solid;
 }
 
 .trade-row{
   /* border-top: 1px solid black; */
   background-color: #e1e1e1;
+  border-radius: 5px;
+  padding: 1px 10px;
+  margin: 1px 10px;
+}
+
+.trade-row-buy{
+  /* border-top: 1px solid black; */
+  background-color:#D0FFC2;
+  border-radius: 5px;
+  padding: 1px 10px;
+  margin: 1px 10px;
+}
+
+.trade-row-sell{
+  /* border-top: 1px solid black; */
+  background-color: #FFC2C2;
   border-radius: 5px;
   padding: 1px 10px;
   margin: 1px 10px;
