@@ -8,6 +8,7 @@
   <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
   <!-- <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script> -->
   <script src="Scripts/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/luxon@2.0.2/build/global/luxon.min.js"></script>
 </head>
 
 <body>
@@ -24,11 +25,11 @@
     <input type="file" ref="myFile" @change="selectedFile"><br />
     <h1 v-if="calculating"> Calculating - {{message}} </h1>
     £{{purchaseValue.toFixed(2)}}, Realised Profit: {{totalRealisedPl.toFixed(2)}}
-    
+
     <h2> Deposits </h2>
     <template v-for="dep in deposits">
       <div class="holding">
-        {{dep.dateString}}: £{{dep.value}}
+        {{dep.dateString}}: £{{dep.value}} U#{{dep.uid}}
       </div>
     </template>
 
@@ -59,8 +60,8 @@
           <template v-for="t,key in inst.trades">
             <!-- {{JSON.stringify(t)}}€€ -->
             <div v-bind:class="getTradeClass(t.rawType)">
-              <p>ID:{{key}} {{new Date(t.timestamp).toString().slice(0,10)}}: {{t.rawType}} {{t.number}} {{t.number > 1?
-                "Shares":"Share"}} @ {{t.price.toFixed(2)}}{{t.currency}}. Total £{{t.total.toFixed(2)}}</p>
+              <p>#{{t.uid}} {{new Date(t.timestamp).toString().slice(0,10)}}: {{t.rawType}} {{t.number}} {{t.number > 1?
+                "Shares":"Share"}} @ £{{t.priceGBP.toFixed(2)}}. Total £{{t.total.toFixed(2)}}</p>
             </div>
           </template>
         </div>
@@ -69,9 +70,11 @@
           Ledger Length: {{inst.ledger.length}}
           <template v-for="d in inst.ledger">
             <!-- {{JSON.stringify(d)}} -->
-            <div class="trade-row">
-              <p> {{new Date(d.timestamp).toString().slice(0,10)}}, Change: {{d.change.toFixed(2)}},
-                {{d.price.toFixed(2)}}p, Total: {{d.total.toFixed(2)}}</p>
+            <div v-bind:class="getTradeClass(d.change)">
+              <p> #{{d.uid}}: {{new Date(d.timestamp).toString().slice(0,10)}}, Change: {{d.change.toFixed(2)}},
+                {{d.price.toFixed(2)}}p,  G:£{{d.gain.toFixed(2)}} L:£{{d.loss.toFixed(2)}}    S104 Holdings:{{d.s104Total.toFixed(2)}}@£{{d.s104Price.toFixed(2)}}
+              <p>{{d.comment}}</p>
+              </p>
             </div>
           </template>
         </div>
@@ -83,6 +86,7 @@
 
 
   </div>
+  <p>The results from this website are assumed to be inaccurate.</p>
 </body>
 
 </html>

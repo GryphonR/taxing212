@@ -1,6 +1,8 @@
 Vue.config.productionTip = false;
 // Vue.config.devtools = false;
 
+var UID = 0;
+
 var assetPrototype = {
 
 }
@@ -21,11 +23,43 @@ const app = new Vue({
   methods: {
     //Housekeeping Methods:
     getTradeClass(type) {
-      if (type === "Buy") {
+      if (isNaN(type)) {
+        if (type === "Buy") {
+          return 'trade-row-buy';
+        } else {
+          return 'trade-row-sell';
+        }
+      } else if (Number(type) > 0) {
         return 'trade-row-buy';
       } else {
         return 'trade-row-sell';
       }
+    },
+    getUID() {
+      return UID++;
+    },
+    sameDay(ref, test) { //returns true if dates are in the same day
+      ref = luxon.DateTime.fromMillis(ref);
+      test = luxon.DateTime.fromMillis(test);
+
+      if (ref.year != test.year) {
+        return false;
+      }
+      else if (ref.month != test.month) {
+        return false
+      }
+      else if (ref.day != test.day) {
+        return false;
+      } else {
+        return true;
+      }
+
+    },
+    getTimestamp(date) {
+      // console.log(date);
+      let timestamp = Date.parse(date);
+      // console.log(timestamp);
+      return timestamp;
     },
     // Calculation Methods:
     selectedFile() {
@@ -43,6 +77,10 @@ const app = new Vue({
           // Remove titles
           var headers = results.data.shift();
 
+          while (results.data[results.data.length - 1][0] == "") { //remove any empty lines from the end of the file
+            results.data.pop();
+          }
+
           for (key in results.data) {
             trade = results.data[key];
 
@@ -52,14 +90,14 @@ const app = new Vue({
               t.newDeposit(trade);
             } else if (type == "Withdrawal") { // Accont Action
               t.newWithdrawal(trade);
-            } else if (type == "Dividend (Ordinary)" || type == "Dividend (Special)"){
+            } else if (type == "Dividend (Ordinary)" || type == "Dividend (Special)") {
               t.newDividend(trade);
             } else { // Specific Holding Action
               t.newTrade(trade);
             }
           }
-          console.log(`Calling calculate Disposals`);
           t.populateLedger();
+          console.log(`Calling calculate Disposals`);
           t.calculateDisposals();
 
           t.calculating = 0;
@@ -68,8 +106,6 @@ const app = new Vue({
         }
       });
       //Now calculate disposals
-
-
     },
     newDeposit(trade) {
       t = this;
@@ -80,7 +116,8 @@ const app = new Vue({
         return;
       }
       let temp = {
-        timestamp: Date.parse(trade[1]),
+        uid: this.getUID(),
+        timestamp: this.getTimestamp(trade[1]),
         dateString: trade[1],
         value: trade[10]
       };
@@ -93,7 +130,8 @@ const app = new Vue({
     },
     newWithdrawal(trade) {
       let temp = {
-        timestamp: Date.parse(trade[1]),
+        uid: this.getUID(),
+        timestamp: this.getTimestamp(trade[1]),
         dateString: trade[1],
         value: trade[10]
       };
@@ -101,9 +139,10 @@ const app = new Vue({
     },
     newDividend(trade) {
       let temp = {
+        uid: this.getUID(),
         ticker: trade[3],
-        name :trade[4],
-        timestamp: Date.parse(trade[1]),
+        name: trade[4],
+        timestamp: this.getTimestamp(trade[1]),
         dateString: trade[1],
         value: trade[10]
       };
@@ -120,7 +159,8 @@ const app = new Vue({
       }
 
       let temp = {
-        timestamp: Date.parse(trade[1]),
+        uid: this.getUID(),
+        timestamp: this.getTimestamp(trade[1]),
         dateString: trade[1],
         orderType: trade[0],
         rawType: rawTradeType,
@@ -128,6 +168,7 @@ const app = new Vue({
         // isin: trade[2],
         number: Number(trade[5]),
         price: Number(trade[6]),
+        priceGBP: Number(trade[6]) / Number(trade[8]), // Price / exchange rate
         currency: trade[7],
         exchangeRate: trade[8],
         result: Number(trade[9]),
@@ -140,7 +181,8 @@ const app = new Vue({
         notes: trade[17],
         t212ID: trade[18],
         frenchTransactionTax: trade[19],
-        wasFree: false
+        wasFree: false,
+        inLedger: 0
       };
 
       /// HOLDINGS
@@ -149,6 +191,7 @@ const app = new Vue({
         // console.log(JSON.stringify(this.holdings));
         // console.log(`Adding ${ticker} to Instruments`);
         this.holdings[ticker] = {
+          uid: this.getUID(),
           ticker: ticker,
           isin: isin,
           name: name,
@@ -162,7 +205,7 @@ const app = new Vue({
           disposals: []
         }
       } else {
-        console.log("Existing Ticker");
+        // console.log("Existing Ticker");
       }
 
       this.holdings[ticker].trades.push(temp);
@@ -186,39 +229,109 @@ const app = new Vue({
     },
     populateLedger() {
       this.message = "Populating Ledger";
-      // Create an individual ledger for each holding.
+      // Create an individual ledger for each holding. This applies the same day rule. 
+      // Multiple buy or multiple sells on the same day will be combined into one ledger entry.
+      /* 
+      The “same day” rule TCGA92/S105(1)
+        All shares of the same class in the same company acquired by the same person on the same day 
+        and in the same capacity are treated as though they were acquired by a single transaction, 
+        TCGA92/S105 (1)(a).
+
+        All shares of the same class in the same company disposed of by the same person on the same day
+        and in the same capacity are also treated as though they were disposed of by a single transaction, 
+        TCGA92/S105 (1)(a).
+      */
+
+
 
       // Ledger Prototype:
       const ledgerProto = {
+        uid: 0,
         timestamp: 0,
-        change: 0,
-        price: 0,
+        change: 0, //Change in share holdings, +ve is buy, -ve is sell
+        price: 0, // Price at which change occured
         currency: "",
         exchangeRate: 0,
         totalGBP: 0,
         feesPaid: 0,
         costBasis: 0,
-        txid: 0
+        txid: 0,
+        tradeCount: 0,
+        tradeIDs: [],
+        comment: "", //TODO make array to hold multiple comments
+        counted: 0, // Has this ledger entry already been accounted for in tax calculations.
+        // split: 0, // Does the tax in this entry fall into more than one category
+        // subledger: [], // If split, breakdown transactions go in here
+        gain: 0,
+        loss: 0,
+        s104Total: 0,
+        s104Price: 0
       }
 
-      for (key in this.holdings) { // For each holding
-        var holding = this.holdings[key];
-        // console.log(`Ledger holding: ${JSON.stringify(holding)}`);
-        // console.log(`Num Trades: ${holding.trades.length}`);
+      for (key in this.holdings) { // For each holding in holdings
 
-        for (tradeKey in holding.trades) { // for each trade
+        var holding = this.holdings[key]; // holding refers to the complete record of each stock on record
+
+        for (tradeKey in holding.trades) { // for each trade in the holding
+
           var t = holding.trades[tradeKey];
-          let temp = Object.create(ledgerProto);
-          temp.timestamp = t.timestamp;
-          temp.change = t.rawType == "Buy" ? t.number : -t.number;
-          // console.log(`Type = ${t.rawType}, buy = ${t.rawType == "BUY"}`);
-          temp.price = t.price;
-          if (holding.ledger.length == 0) {
-            temp.total = temp.change;
-          } else {
-            temp.total = Number(holding.ledger[holding.ledger.length - 1].total) + temp.change;
+
+          if (!t.inLedger) {    // If trade is not already in the ledger        
+            // let temp = Object.create(ledgerProto);
+            let temp = JSON.parse(JSON.stringify(ledgerProto));
+            temp.uid = this.getUID();
+            temp.timestamp = t.timestamp;
+            temp.change = t.rawType == "Buy" ? t.number : -t.number;
+            temp.price = t.priceGBP;
+            temp.tradeCount = 1;
+            temp.tradeIDs.push(t.uid);
+            // if (holding.ledger.length == 0) { // Keep a runing total of shares held
+            //   temp.total = temp.change;
+            // } else {
+            //   temp.total = Number(holding.ledger[holding.ledger.length - 1].total) + temp.change;
+            // }
+            holding.ledger.push(temp);
+            t.inLedger = 1; //Mark trade as in ledger
           }
-          holding.ledger.push(temp);
+
+          let ledgerIndex = holding.ledger.length - 1;// The index at which the last holding was stored
+          let currTradeType = t.rawType;
+
+          // Now cycle through trades again and determine if any are of the same type, on the same day, 
+          // and not yet in the ledger
+
+          for (i in holding.trades) {
+            compTrade = holding.trades[i];
+            if (!compTrade.inLedger) { //Trade under comparison is not in ledger, therefore check it.
+              if (compTrade.rawType === currTradeType) { //Trade type matches
+                if (this.sameDay(t.timestamp, compTrade.timestamp)) {
+                  console.log(`Same Day Rule, Combined trades ${t.uid} with ${compTrade.uid}`);
+                  // Add this trade to the current ledger entry, holding.ledger[ledgerIndex]
+                  holding.ledger[ledgerIndex].tradeIDs.push(compTrade.uid);
+                  holding.ledger[ledgerIndex].tradeCount++;
+
+                  // Calculate new share number and price
+                  let currNP = holding.ledger[ledgerIndex].change * holding.ledger[ledgerIndex].price; //Ledger entry current price*holdings
+                  let newTradeChange = compTrade.rawType == "Buy" ? compTrade.number : -compTrade.number;
+                  let newNP = newTradeChange * compTrade.price;
+
+                  holding.ledger[ledgerIndex].change += newTradeChange; //sum of shares in this ledger entry so far
+                  holding.ledger[ledgerIndex].price = (currNP + newNP) / Math.abs(holding.ledger[ledgerIndex].change);
+
+                  compTrade.inLedger = 1; // trade is in ledger
+                  holding.ledger[ledgerIndex].comment = `Same Day Rule Applied to ${holding.ledger[ledgerIndex].tradeCount} Trades.`
+                }
+              }
+            }
+          }
+
+          // Now calculate the running total:
+          // if (ledgerIndex == 0) { // Keep a runing total of shares held
+          //   holding.ledger[ledgerIndex].total = holding.ledger[ledgerIndex].change;
+          // } else {
+          //   holding.ledger[ledgerIndex].total = Number(holding.ledger[ledgerIndex - 1].total) + holding.ledger[ledgerIndex].change;
+          // }
+
           // console.log(`Adding to ${holding.ticker} ledger: ${JSON.stringify(temp)}`);
         }
         // console.log(`Num Ledger Entries: ${holding.ledger.length}`);
@@ -227,21 +340,259 @@ const app = new Vue({
 
     },
     calculateDisposals() {
-      this.message = "Calculating Disposals";
-      // console.log(`Disp: All Holdings: ${JSON.stringify(this.holdings)}`);
+      //  Order of calculations:
+      //  Check if same day disposal - marks as such. Split buy or sell transaction in ledger as appropriate
+      //  Check if buy is within 30 days of sell - mark and split ledger transations appropriately
+      //  Calculate Section104 Pool Price
 
-      for (key in this.holdings) {
+
+
+      // Handle same day disposals.
+
+      /*
+      Same day Rules: https://www.gov.uk/hmrc-internal-manuals/capital-gains-manual/cg51560#IDATX33F
+
+      If there is an acquisition and a disposal on the same day the disposal is identified first against the acquisition
+      on the same day, TCGA92/S105 (1)(b).
+      
+      If the number of shares disposed of exceeds the number acquired on the same day the excess shares will be identified
+      in the normal way.
+      
+      If the number of shares acquired exceeds the number sold on the same day the surplus is added to the Section 104 holding,
+      unless they are identified with disposals under the ‘bed and breakfast’ rule, see below
+      
+      */
+
+      for (key in this.holdings) { // For each holding in holdings
         var holding = this.holdings[key];
-        console.log(JSON.stringify(holding));
-        if (holding.disposalCount) {
 
-          //What we need to do...
-          //  Check if trade is a sell.
-          //  If sell, check if same day disposal - marks as such
-          //  else check if BNB/30 day disposal
-          //  else mark as Section104
+        for (i in holding.ledger) {
+          sell = holding.ledger[i];
+
+          if (sell.change < 0 && !sell.counted) { //disposal
+            for (j in holding.ledger) {
+              buy = holding.ledger[j];
+              if (this.sameDay(sell.timestamp, buy.timestamp) && buy.change > 0 && !buy.counted) {
+                // Ledger entry with a buy on same day as disposal
+                console.log(`Sameday Disposal UID${sell.uid}`);
+                // buyare shares transacted in each entry:
+                if ((sell.change + buy.change) === 0) {
+                  // Happy days, they match. Calculate gain/loss
+                  console.log(`${sell.change} ${sell.price}`)
+                  let tmp = Math.abs(Number(sell.price) * Number(sell.change)) - Number(buy.price) * Number(buy.change);
+                  console.log(`Temp GL = ${tmp}`);
+                  if (tmp > 0) {
+                    //gain
+                    sell.gain = tmp;
+                  } else {
+                    sell.loss = Math.abs(tmp);
+                  }
+
+                  sell.counted = 1;
+                  buy.counted = 1;
+
+                } else {
+                  // Split same day disposal
+                  console.log(`Split same day disposal`);
+                  if (Math.abs(sell.change) > buy.change) { //More sold on day than bought on day
+                    // We need to split the sold ledger entry into two.
+                    sell.comment = sell.comment + `Entry split for sameday rule matching Buy entry #${buy.uid}`;
+                    sellCopy = JSON.parse(JSON.stringify(sell));
+                    sellCopy.uid = this.getUID();
+                    sell.change = -(buy.change);
+                    sellCopy.change = Number(sellCopy.change) - Number(sell.change);
+
+                    holding.ledger.splice(i, 0, sellCopy);
+
+                    let tmp = Math.abs(Number(sell.price) * Number(sell.change)) - Number(buy.price) * Number(buy.change);
+                    console.log(`Temp GL = ${tmp}`);
+                    if (tmp > 0) {
+                      //gain
+                      sell.gain = tmp;
+                    } else {
+                      sell.loss = Math.abs(tmp);
+                    }
+
+                    sell.counted = 1;
+                    buy.counted = 1;
+                    console.log(JSON.stringify(holding.ledger));
+
+                  } else { //Buy change greater than sell change, split buy
+                    buy.comment = buy.comment + `Entry split for sameday rule matching Sell entry #${sell.uid}`;
+                    buyCopy = JSON.parse(JSON.stringify(buy));
+                    buyCopy.uid = this.getUID();
+                    buy.change = Math.abs(sell.change);
+                    buyCopy.change = Number(buyCopy.change) - Number(buy.change);
+                    // console.log(Number(buyCopy.change));
+                    // console.log(Number(buy.change));
+
+                    let tmp = Math.abs(Number(sell.price) * Number(sell.change)) - Number(buy.price) * Number(buy.change);
+                    console.log(`Temp GL = ${tmp}`);
+                    if (tmp > 0) {
+                      //gain
+                      sell.gain = tmp;
+                    } else {
+                      sell.loss = Math.abs(tmp);
+                    }
 
 
+                    holding.ledger.splice(j, 0, buyCopy);
+                    sell.counted = 1;
+                    buy.counted = 1;
+                    console.log(JSON.stringify(holding.ledger));
+
+                  }
+
+                }
+              }
+            }
+          }
+        }// /iterate through ledger for same day rule disposals
+
+        // Now iterate through for the Bed and Breakfasting rule
+        console.log("Checking for 30 day BNB");
+        for (i in holding.ledger) {
+          buy = holding.ledger[i];
+
+          if (buy.change > 0 && !buy.counted) { //actually is a buy
+            //30 days in ms
+            let thirtyDays = 1000 * 60 * 60 * 24 * 30;
+
+            let cutOff = buy.timestamp - thirtyDays;
+
+
+            // Now need to look for sells between cutoff and buy
+
+            for (j in holding.ledger) {
+              sell = holding.ledger[j];
+              if (sell.change < 0 && !sell.counted) { //sell
+                if (sell.timestamp > cutOff && sell.timestamp < buy.timestamp) {
+                  console.log(`#${buy.uid} bought within 30 days of #${sell.uid}`);
+
+                  if (sell.change + buy.change === 0) { //Trades are the same size
+                    sell.counted = 1;
+                    sell.comment = sell.comment + ` | 30 day BnB rule, counted against Buy #${buy.uid}`;
+                    buy.counted = 1;
+                    buy.comment += buy.comment + ` | 30 day BnB rule, counted against Sell #${sell.uid}`;
+
+                    let tmp = (Number(sell.price) * Math.abs(sell.change)) - (Number(buy.price) * Number(buy.change));
+
+                    if (tmp > 0) {
+                      //gain
+                      buy.gain = tmp;
+                    } else {
+                      buy.loss = Math.abs(tmp);
+                    }
+
+                    console.log(`Buy #${buy.uid} 30 day BnB rule, counted against Sell #${sell.uid}`);
+
+                  } else if (sell.change + buy.change < 0) { //More shares were sold.
+                    // need to split the sell entry to match the buy entry
+                    console.log(`Sell #${sell.uid} being split for 30 day rule to match Buy entry #${buy.uid}`);
+
+                    sellCopy = JSON.parse(JSON.stringify(sell));
+                    sellCopy.uid = this.getUID();
+
+                    sell.change = -(buy.change);
+                    sellCopy.change = Number(sellCopy.change) - Number(sell.change);
+                    sell.counted = 1;
+                    buy.counted = 1;
+                    buy.comment += buy.comment + ` | 30 day BnB rule, counted against Sell #${sellCopy.uid}`;
+                    sell.comment = sell.comment + ` | Entry split into #${sellCopy.uid} for 30 day rule matching Buy entry #${buy.uid}`;
+
+
+                    let tmp = (Number(sell.price) * Math.abs(sell.change)) - (Number(buy.price) * Number(buy.change));
+
+                    if (tmp > 0) {
+                      //gain
+                      buy.gain = tmp;
+                    } else {
+                      buy.loss = Math.abs(tmp);
+                    }
+
+                    sell.comment = sell.comment + ` | 30 day BnB rule, counted against Buy #${buy.uid}`;
+                    let newPos = Number(j) + 1;
+                    // console.log(`Splicing ${sellCopy.uid} int array pos ${newPos}. Sell Array pos is ${j}`);
+                    holding.ledger.splice(newPos, 0, sellCopy);
+
+                    console.log(`Buy #${buy.uid} 30 day BnB rule, counted against Sell #${sellCopy.uid}`);
+
+                    break;
+
+                  } else if (sell.change + buy.change > 0) { //More shares were bought.
+                    // need to split the buy entry to match the sell entry
+                    console.log(`Buy #${buy.uid} being split for 30 day rule to match Sell entry #${sell.uid}`);
+
+                    buyCopy = JSON.parse(JSON.stringify(buy));
+                    buyCopy.uid = this.getUID();
+
+                    buy.change = -(sell.change); // The entry we're counting the sell against
+                    buyCopy.change = Number(buyCopy.change) - Number(buy.change); // the remainder
+                    sell.counted = 1;
+                    buy.counted = 1;
+                    buy.comment = buy.comment + ` | Entry split into #${buyCopy.uid} for 30 day rule and matched to Sell entry #${sell.uid}`;
+                    sell.comment = sell.comment + ` | 30 day BnB rule, counted against Buy #${buy.uid}`;
+
+
+                    let tmp = (Number(sell.price) * Math.abs(sell.change)) - (Number(buy.price) * Number(buy.change));
+
+                    if (tmp > 0) {
+                      //gain
+                      buy.gain = tmp;
+                    } else {
+                      buy.loss = Math.abs(tmp);
+                    }
+
+                    let newPos = Number(i) + 1;
+                    // console.log(`Splicing ${buyCopy.uid} int array pos ${newPos}. Sell Array pos is ${j}`);
+                    holding.ledger.splice(newPos, 0, buyCopy);
+
+                    console.log(`Buy #${buy.uid} 30 day BnB rule, counted against Sell #${buyCopy.uid}`);
+
+                    break;
+
+                  }
+                }
+              }
+            }
+
+          }
+
+        } // /Check for 30day rule
+        // Now all splits have been done, calculate the Section 104 holdings
+        for (i in holding.ledger) {
+          entry = holding.ledger[i];
+          if (entry.change > 0) { //buy
+            if (!entry.counted) {
+              if (Number(i) === 0) {
+                entry.s104Total = entry.change;
+                entry.s104Price = entry.price;
+              } else {
+                entry.s104Total = Number(holding.ledger[Number(i) - 1].s104Total) + Number(entry.change);
+
+                entry.s104Price = ((Number(holding.ledger[Number(i) - 1].s104Total) * Number(holding.ledger[Number(i) - 1].s104Price)) + (Number(entry.change) + Number(entry.price)) / Number(entry.s104Total));
+
+              }
+            } else if (Number(i) > 0) {
+              entry.s104Total = Number(holding.ledger[Number(i) - 1].s104Total);
+              entry.s104Price = Number(holding.ledger[Number(i) - 1].s104Price);
+            }
+          } else if (!entry.counted && entry.change < 0) {
+            // Selling section 104 holding
+            if (Number(i) === 0) {
+              console.log(`Error - no history of holdings for disposal ${entry.uid} of ${holding.name}`);
+            } else {
+              let tmp = (Math.abs(entry.change) * Number(entry.price)) - (Math.abs(entry.change) * Number(holding.ledger[Number(i) - 1].s104Price));
+              entry.s104Total = (Number(holding.ledger[Number(i) - 1].s104Total) - Math.abs(entry.change));
+              if (tmp > 0) {
+                //gain
+                entry.gain = tmp;
+              } else {
+                entry.loss = Math.abs(tmp);
+              }
+              entry.comment = entry.comment + `Gain calculated agains Section 104 Holdings`;
+            }
+          }
         }
       }
     }
