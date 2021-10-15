@@ -90,7 +90,7 @@ const app = new Vue({
               t.newDeposit(trade);
             } else if (type == "Withdrawal") { // Accont Action
               t.newWithdrawal(trade);
-            } else if (type == "Dividend (Ordinary)" || type == "Dividend (Special)") {
+            } else if (type == "Dividend (Ordinary)" || type == "Dividend (Special)" || type == "Dividend (Bonus)")  {
               t.newDividend(trade);
             } else { // Specific Holding Action
               t.newTrade(trade);
@@ -562,28 +562,32 @@ const app = new Vue({
         // Now all splits have been done, calculate the Section 104 holdings
         for (i in holding.ledger) {
           entry = holding.ledger[i];
+          i = Number(i);
           if (entry.change > 0) { //buy
             if (!entry.counted) {
-              if (Number(i) === 0) {
+              if (i === 0) {
                 entry.s104Total = entry.change;
                 entry.s104Price = entry.price;
               } else {
-                entry.s104Total = Number(holding.ledger[Number(i) - 1].s104Total) + Number(entry.change);
+                entry.s104Total = Number(holding.ledger[i - 1].s104Total) + Number(entry.change);
 
-                entry.s104Price = ((Number(holding.ledger[Number(i) - 1].s104Total) * Number(holding.ledger[Number(i) - 1].s104Price)) + (Number(entry.change) + Number(entry.price)) / Number(entry.s104Total));
+                // let prevValue = holding.ledger[i - 1].s104Total * holding.ledger[i - 1].s104Price;
+                // let newValue = Number(entry.change) * Number(entry.price)
+
+                entry.s104Price = ((Number(holding.ledger[i - 1].s104Total) * Number(holding.ledger[i - 1].s104Price)) + (Number(entry.change) * Number(entry.price))) / Number(entry.s104Total);
 
               }
-            } else if (Number(i) > 0) {
-              entry.s104Total = Number(holding.ledger[Number(i) - 1].s104Total);
-              entry.s104Price = Number(holding.ledger[Number(i) - 1].s104Price);
+            } else if (i > 0) {
+              entry.s104Total = Number(holding.ledger[i - 1].s104Total);
+              entry.s104Price = Number(holding.ledger[i - 1].s104Price);
             }
           } else if (!entry.counted && entry.change < 0) {
             // Selling section 104 holding
-            if (Number(i) === 0) {
+            if (i === 0) {
               console.log(`Error - no history of holdings for disposal ${entry.uid} of ${holding.name}`);
             } else {
-              let tmp = (Math.abs(entry.change) * Number(entry.price)) - (Math.abs(entry.change) * Number(holding.ledger[Number(i) - 1].s104Price));
-              entry.s104Total = (Number(holding.ledger[Number(i) - 1].s104Total) - Math.abs(entry.change));
+              let tmp = (Math.abs(entry.change) * Number(entry.price)) - (Math.abs(entry.change) * Number(holding.ledger[i - 1].s104Price));
+              entry.s104Total = (Number(holding.ledger[i - 1].s104Total) - Math.abs(entry.change));
               if (tmp > 0) {
                 //gain
                 entry.gain = tmp;
