@@ -19,7 +19,7 @@ body{
 
 .disposal-container{
   display: grid;
-  grid-template-columns: repeat(12, 1fr);
+  grid-template-columns: 0.5fr 1.5fr repeat(10, 1fr);
   background-color: #f2f2f2;
   padding: 10px;
   border-radius: 5px;

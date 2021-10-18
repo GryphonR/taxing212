@@ -10,7 +10,9 @@ var assetPrototype = {
 const app = new Vue({
   el: '#app',
   data: {
+    targetTaxYear: new Date().getFullYear() - 1,
     calculating: 0,
+    calculated: 0,
     message: "",
     purchaseValue: 0,
     totalRealisedPl: 0,
@@ -20,7 +22,21 @@ const app = new Vue({
     freeShares: [],
     holdings: {}
   },
+  mounted: function() {
+    // targetTaxYear = new Date().getFullYear();
+  },
+  computed: {
+    fyText: function() {
+      let a = Number(this.targetTaxYear);
+      let b = Number(this.targetTaxYear) + 1;
+      a = String(a).slice(-2);
+      b = String(b).slice(-2);
+      return (`${a}-${b}FY`);
+    }
+  },
   methods: {
+    //UI Functions:
+
     //Housekeeping Methods:
     getTradeClass(type) {
       if (isNaN(type)) {
@@ -44,11 +60,9 @@ const app = new Vue({
 
       if (ref.year != test.year) {
         return false;
-      }
-      else if (ref.month != test.month) {
+      } else if (ref.month != test.month) {
         return false
-      }
-      else if (ref.day != test.day) {
+      } else if (ref.day != test.day) {
         return false;
       } else {
         return true;
@@ -62,27 +76,83 @@ const app = new Vue({
       return timestamp;
     },
     // Calculation Methods:
-    selectedFile() {
-      t = this
-      console.log('selected a file');
-      // console.log(this.$refs.myFile.files[0]);
+    addFile() {
+      let data = [];
+      let dataKey = 0;
+      if (localStorage.getItem("rawData") != null) {
+        data = JSON.parse(localStorage.getItem('rawData'));
+        console.log(`Files exist: ${data[0].name}`);
+        dataKey = data.length - 1;
+      }
 
-      this.calculating = 1;
-      this.message = "Parseing CSV";
+      // for (i in this.$refs.csvFile.files) {
 
-      var file = this.$refs.myFile.files[0];
-      // console.log(file);
-      var trades = Papa.parse(file, {
-        complete: function (results) {
-          // Remove titles
-          var headers = results.data.shift();
+      var localFile = this.$refs.csvFile.files[0];
 
-          while (results.data[results.data.length - 1][0] == "") { //remove any empty lines from the end of the file
-            results.data.pop();
+      let file = {
+        name: "",
+        data: ""
+      }
+      // console.log(`File Data: ${JSON.stringify(localFile)}`);
+
+      file.name = localFile.name;
+
+      let uniquFile = 1;
+
+      // for (let j = 0; j < data.length; j++) {
+      for (j in data) {
+        if (data[j].name === file.name) {
+          uniquFile = 0;
+          alert(`${file.name}\n\nWarning: A file with this name is already loaded.\nIt has not been added again.`);
+        }
+      }
+
+      // console.log(`File Name: ${file.name}`);
+      if (uniquFile) {
+        // console.log(file);
+        var trades = Papa.parse(localFile, {
+          complete: function(results) {
+            // Remove titles
+            var headers = results.data.shift();
+
+            while (results.data[results.data.length - 1][0] == "") { //remove any empty lines from the end of the file
+              results.data.pop();
+            }
+            file.data = results.data;
+            data.push(file);
+            localStorage.setItem("rawData", JSON.stringify(data));
+            console.log(`File Data: ${JSON.stringify(file.data)}`);
           }
+        });
+      }
 
-          for (key in results.data) {
-            trade = results.data[key];
+    },
+    calculate() {
+      t = this
+      // console.log('selected a file');
+      // // console.log(this.$refs.myFile.files[0]);
+      //
+      // this.calculating = 1;
+      // this.message = "Parseing CSV";
+      //
+      // var file = this.$refs.csvFile.files[0];
+      // console.log(file);
+      // var trades = Papa.parse(file, {
+      //   complete: function(results) {
+      //     // Remove titles
+      //     var headers = results.data.shift();
+      //
+      //     while (results.data[results.data.length - 1][0] == "") { //remove any empty lines from the end of the file
+      //       results.data.pop();
+      //     }
+
+      let data = [];
+      if (localStorage.getItem("rawData") != null) {
+        data = JSON.parse(localStorage.getItem('rawData'));
+
+        for (file in data) {
+          for (key in data[file].data) {
+            trade = data[file].data[key];
 
             let type = trade[0];
 
@@ -90,22 +160,29 @@ const app = new Vue({
               t.newDeposit(trade);
             } else if (type == "Withdrawal") { // Accont Action
               t.newWithdrawal(trade);
-            } else if (type == "Dividend (Ordinary)" || type == "Dividend (Special)" || type == "Dividend (Bonus)")  {
+            } else if (type == "Dividend (Ordinary)" || type == "Dividend (Special)" || type == "Dividend (Bonus)") {
               t.newDividend(trade);
             } else { // Specific Holding Action
               t.newTrade(trade);
             }
           }
-          t.populateLedger();
-          console.log(`Calling calculate Disposals`);
-          t.calculateDisposals();
-
-          t.calculating = 0;
-          // console.log(JSON.stringify(this.holdings));
-          // data = results.data;
         }
-      });
-      //Now calculate disposals
+
+        t.populateLedger();
+        console.log(`Calling calculate Disposals`);
+        t.calculateDisposals();
+
+        t.calculating = 0;
+        t.calculated = 1;
+        // console.log(JSON.stringify(this.holdings));
+        // data = data;
+        //   }
+        // });
+        //Now calculate disposals
+
+      } else {
+        alert("No Files loaded - add your data and try again.");
+      }
     },
     newDeposit(trade) {
       t = this;
@@ -229,16 +306,16 @@ const app = new Vue({
     },
     populateLedger() {
       this.message = "Populating Ledger";
-      // Create an individual ledger for each holding. This applies the same day rule. 
+      // Create an individual ledger for each holding. This applies the same day rule.
       // Multiple buy or multiple sells on the same day will be combined into one ledger entry.
-      /* 
+      /*
       The “same day” rule TCGA92/S105(1)
-        All shares of the same class in the same company acquired by the same person on the same day 
-        and in the same capacity are treated as though they were acquired by a single transaction, 
+        All shares of the same class in the same company acquired by the same person on the same day
+        and in the same capacity are treated as though they were acquired by a single transaction,
         TCGA92/S105 (1)(a).
 
         All shares of the same class in the same company disposed of by the same person on the same day
-        and in the same capacity are also treated as though they were disposed of by a single transaction, 
+        and in the same capacity are also treated as though they were disposed of by a single transaction,
         TCGA92/S105 (1)(a).
       */
 
@@ -258,14 +335,19 @@ const app = new Vue({
         txid: 0,
         tradeCount: 0,
         tradeIDs: [],
-        comment: "", //TODO make array to hold multiple comments
+        // comment: "", //TODO make array to hold multiple comments
+        comment: [], //TODO make array to hold multiple comments
         counted: 0, // Has this ledger entry already been accounted for in tax calculations.
         // split: 0, // Does the tax in this entry fall into more than one category
         // subledger: [], // If split, breakdown transactions go in here
         gain: 0,
         loss: 0,
         s104Total: 0,
-        s104Price: 0
+        s104Price: 0,
+        taxable: 0,
+        totalPnl: 0,
+        matchedUid: 0,
+        rule: ""
       }
 
       for (key in this.holdings) { // For each holding in holdings
@@ -276,7 +358,7 @@ const app = new Vue({
 
           var t = holding.trades[tradeKey];
 
-          if (!t.inLedger) {    // If trade is not already in the ledger        
+          if (!t.inLedger) { // If trade is not already in the ledger
             // let temp = Object.create(ledgerProto);
             let temp = JSON.parse(JSON.stringify(ledgerProto));
             temp.uid = this.getUID();
@@ -294,10 +376,10 @@ const app = new Vue({
             t.inLedger = 1; //Mark trade as in ledger
           }
 
-          let ledgerIndex = holding.ledger.length - 1;// The index at which the last holding was stored
+          let ledgerIndex = holding.ledger.length - 1; // The index at which the last holding was stored
           let currTradeType = t.rawType;
 
-          // Now cycle through trades again and determine if any are of the same type, on the same day, 
+          // Now cycle through trades again and determine if any are of the same type, on the same day,
           // and not yet in the ledger
 
           for (i in holding.trades) {
@@ -319,7 +401,7 @@ const app = new Vue({
                   holding.ledger[ledgerIndex].price = (currNP + newNP) / Math.abs(holding.ledger[ledgerIndex].change);
 
                   compTrade.inLedger = 1; // trade is in ledger
-                  holding.ledger[ledgerIndex].comment = `Same Day Rule Applied to ${holding.ledger[ledgerIndex].tradeCount} Trades.`
+                  holding.ledger[ledgerIndex].comment.push(`${holding.ledger[ledgerIndex].tradeCount} trades merged for Same Day Rule.`);
                 }
               }
             }
@@ -345,8 +427,6 @@ const app = new Vue({
       //  Check if buy is within 30 days of sell - mark and split ledger transations appropriately
       //  Calculate Section104 Pool Price
 
-
-
       // Handle same day disposals.
 
       /*
@@ -354,13 +434,13 @@ const app = new Vue({
 
       If there is an acquisition and a disposal on the same day the disposal is identified first against the acquisition
       on the same day, TCGA92/S105 (1)(b).
-      
+
       If the number of shares disposed of exceeds the number acquired on the same day the excess shares will be identified
       in the normal way.
-      
+
       If the number of shares acquired exceeds the number sold on the same day the surplus is added to the Section 104 holding,
       unless they are identified with disposals under the ‘bed and breakfast’ rule, see below
-      
+
       */
 
       for (key in this.holdings) { // For each holding in holdings
@@ -388,6 +468,13 @@ const app = new Vue({
                     sell.loss = Math.abs(tmp);
                   }
 
+                  sell.comment.push(`Same Day Disposal counted against buy ${buy.uid}`);
+                  sell.rule = "Same Day";
+
+                  sell.totalPnl = tmp;
+                  sell.taxable = 1;
+                  sell.matchedUid = buy.uid;
+
                   sell.counted = 1;
                   buy.counted = 1;
 
@@ -396,7 +483,7 @@ const app = new Vue({
                   console.log(`Split same day disposal`);
                   if (Math.abs(sell.change) > buy.change) { //More sold on day than bought on day
                     // We need to split the sold ledger entry into two.
-                    sell.comment = sell.comment + `Entry split for sameday rule matching Buy entry #${buy.uid}`;
+                    sell.comment.push(`Entry split for sameday rule matching Buy entry #${buy.uid}`);
                     sellCopy = JSON.parse(JSON.stringify(sell));
                     sellCopy.uid = this.getUID();
                     sell.change = -(buy.change);
@@ -413,12 +500,19 @@ const app = new Vue({
                       sell.loss = Math.abs(tmp);
                     }
 
+                    sell.comment.push(`Same Day Disposal counted against buy ${buy.uid}`);
+                    sell.rule = "Same Day";
+
+                    sell.totalPnl = tmp;
+                    sell.taxable = 1;
+                    sell.matchedUid = buy.uid;
+
                     sell.counted = 1;
                     buy.counted = 1;
                     console.log(JSON.stringify(holding.ledger));
 
                   } else { //Buy change greater than sell change, split buy
-                    buy.comment = buy.comment + `Entry split for sameday rule matching Sell entry #${sell.uid}`;
+                    buy.comment.push(`Entry split for sameday rule matching Sell entry #${sell.uid}`);
                     buyCopy = JSON.parse(JSON.stringify(buy));
                     buyCopy.uid = this.getUID();
                     buy.change = Math.abs(sell.change);
@@ -435,6 +529,12 @@ const app = new Vue({
                       sell.loss = Math.abs(tmp);
                     }
 
+                    sell.comment.push(`Same Day Disposal counted against buy ${buy.uid}`);
+                    sell.rule = "Same Day";
+
+                    sell.totalPnl = tmp;
+                    sell.taxable = 1;
+                    sell.matchedUid = buy.uid;
 
                     holding.ledger.splice(j, 0, buyCopy);
                     sell.counted = 1;
@@ -447,7 +547,7 @@ const app = new Vue({
               }
             }
           }
-        }// /iterate through ledger for same day rule disposals
+        } // /iterate through ledger for same day rule disposals
 
         // Now iterate through for the Bed and Breakfasting rule
         console.log("Checking for 30 day BNB");
@@ -471,9 +571,9 @@ const app = new Vue({
 
                   if (sell.change + buy.change === 0) { //Trades are the same size
                     sell.counted = 1;
-                    sell.comment = sell.comment + ` | 30 day BnB rule, counted against Buy #${buy.uid}`;
+                    sell.comment.push(`30 day BnB rule, counted against Buy #${buy.uid}`);
                     buy.counted = 1;
-                    buy.comment += buy.comment + ` | 30 day BnB rule, counted against Sell #${sell.uid}`;
+                    buy.comment.push(`30 day BnB rule, counted against Sell #${sell.uid}`);
 
                     let tmp = (Number(sell.price) * Math.abs(sell.change)) - (Number(buy.price) * Number(buy.change));
 
@@ -483,6 +583,11 @@ const app = new Vue({
                     } else {
                       buy.loss = Math.abs(tmp);
                     }
+
+                    sell.rule = "30 Day BnB";
+                    sell.totalPnl = tmp;
+                    sell.taxable = 1;
+                    sell.matchedUid = buy.uid;
 
                     console.log(`Buy #${buy.uid} 30 day BnB rule, counted against Sell #${sell.uid}`);
 
@@ -497,22 +602,26 @@ const app = new Vue({
                     sellCopy.change = Number(sellCopy.change) - Number(sell.change);
                     sell.counted = 1;
                     buy.counted = 1;
-                    buy.comment += buy.comment + ` | 30 day BnB rule, counted against Sell #${sellCopy.uid}`;
-                    sell.comment = sell.comment + ` | Entry split into #${sellCopy.uid} for 30 day rule matching Buy entry #${buy.uid}`;
+                    buy.comment.push(`30 day BnB rule, counted against Sell #${sellCopy.uid}`);
+                    sell.comment.push(`Entry split into #${sellCopy.uid} for 30 day rule matching Buy entry #${buy.uid}`);
 
 
                     let tmp = (Number(sell.price) * Math.abs(sell.change)) - (Number(buy.price) * Number(buy.change));
 
                     if (tmp > 0) {
                       //gain
-                      buy.gain = tmp;
+                      sell.gain = tmp;
                     } else {
-                      buy.loss = Math.abs(tmp);
+                      sell.loss = Math.abs(tmp);
                     }
 
-                    sell.comment = sell.comment + ` | 30 day BnB rule, counted against Buy #${buy.uid}`;
+                    sell.rule = "30 Day BnB";
+                    sell.totalPnl = tmp;
+                    sell.taxable = 1;
+                    sell.matchedUid = buy.uid;
+
+                    sell.comment.push(`30 day BnB rule, counted against Buy #${buy.uid}`);
                     let newPos = Number(j) + 1;
-                    // console.log(`Splicing ${sellCopy.uid} int array pos ${newPos}. Sell Array pos is ${j}`);
                     holding.ledger.splice(newPos, 0, sellCopy);
 
                     console.log(`Buy #${buy.uid} 30 day BnB rule, counted against Sell #${sellCopy.uid}`);
@@ -530,18 +639,23 @@ const app = new Vue({
                     buyCopy.change = Number(buyCopy.change) - Number(buy.change); // the remainder
                     sell.counted = 1;
                     buy.counted = 1;
-                    buy.comment = buy.comment + ` | Entry split into #${buyCopy.uid} for 30 day rule and matched to Sell entry #${sell.uid}`;
-                    sell.comment = sell.comment + ` | 30 day BnB rule, counted against Buy #${buy.uid}`;
+                    buy.comment.push(`Entry split into #${buyCopy.uid} for 30 day rule and matched to Sell entry #${sell.uid}`);
+                    sell.comment.push(`30 day BnB rule, counted against Buy #${buy.uid}`);
 
 
                     let tmp = (Number(sell.price) * Math.abs(sell.change)) - (Number(buy.price) * Number(buy.change));
 
                     if (tmp > 0) {
                       //gain
-                      buy.gain = tmp;
+                      sell.gain = tmp;
                     } else {
-                      buy.loss = Math.abs(tmp);
+                      sell.loss = Math.abs(tmp);
                     }
+
+                    sell.rule = "30 Day BnB";
+                    sell.totalPnl = tmp;
+                    sell.taxable = 1;
+                    sell.matchedUid = buy.uid;
 
                     let newPos = Number(i) + 1;
                     // console.log(`Splicing ${buyCopy.uid} int array pos ${newPos}. Sell Array pos is ${j}`);
@@ -594,9 +708,22 @@ const app = new Vue({
               } else {
                 entry.loss = Math.abs(tmp);
               }
-              entry.comment = entry.comment + `Gain calculated agains Section 104 Holdings`;
+              entry.rule = "Section 104";
+              entry.totalPnl = tmp;
+              entry.taxable = 1;
+              entry.matchedUid = buy.uid;
+
+              entry.comment.push(`Gain calculated against Section 104 Holdings`);
             }
           }
+
+          //All PnL calculated, now sum up for the holdings realisedPl
+          let pnl = 0;
+          for (i in holding.ledger) {
+            entry = holding.ledger[i];
+            pnl += entry.totalPnl;
+          }
+          holding.realisedPl = pnl;
         }
       }
     }
