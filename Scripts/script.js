@@ -10,7 +10,11 @@ var assetPrototype = {
 const app = new Vue({
   el: '#app',
   data: {
-    targetTaxYear: new Date().getFullYear() - 1,
+    taxYear: {
+      target: new Date().getFullYear() - 1,
+      start:0,
+      end:0
+    },
     calculating: 0,
     calculated: 0,
     message: "",
@@ -22,15 +26,18 @@ const app = new Vue({
     freeShares: [],
     holdings: {}
   },
-  mounted: function() {
+  mounted: function () {
     // targetTaxYear = new Date().getFullYear();
   },
   computed: {
-    fyText: function() {
-      let a = Number(this.targetTaxYear);
-      let b = Number(this.targetTaxYear) + 1;
+    fyText: function () {
+      let a = Number(this.taxYear.target);
+      let b = Number(this.taxYear.target) + 1;
       a = String(a).slice(-2);
       b = String(b).slice(-2);
+
+      // Also using this function to compute tax year start and end dates:
+
       return (`${a}-${b}FY`);
     }
   },
@@ -85,21 +92,17 @@ const app = new Vue({
         dataKey = data.length - 1;
       }
 
-      // for (i in this.$refs.csvFile.files) {
-
       var localFile = this.$refs.csvFile.files[0];
 
       let file = {
         name: "",
         data: ""
       }
-      // console.log(`File Data: ${JSON.stringify(localFile)}`);
 
       file.name = localFile.name;
 
       let uniquFile = 1;
 
-      // for (let j = 0; j < data.length; j++) {
       for (j in data) {
         if (data[j].name === file.name) {
           uniquFile = 0;
@@ -111,7 +114,7 @@ const app = new Vue({
       if (uniquFile) {
         // console.log(file);
         var trades = Papa.parse(localFile, {
-          complete: function(results) {
+          complete: function (results) {
             // Remove titles
             var headers = results.data.shift();
 
@@ -129,22 +132,6 @@ const app = new Vue({
     },
     calculate() {
       t = this
-      // console.log('selected a file');
-      // // console.log(this.$refs.myFile.files[0]);
-      //
-      // this.calculating = 1;
-      // this.message = "Parseing CSV";
-      //
-      // var file = this.$refs.csvFile.files[0];
-      // console.log(file);
-      // var trades = Papa.parse(file, {
-      //   complete: function(results) {
-      //     // Remove titles
-      //     var headers = results.data.shift();
-      //
-      //     while (results.data[results.data.length - 1][0] == "") { //remove any empty lines from the end of the file
-      //       results.data.pop();
-      //     }
 
       let data = [];
       if (localStorage.getItem("rawData") != null) {
@@ -156,11 +143,13 @@ const app = new Vue({
 
             let type = trade[0];
 
+            let firstword = type.substr(0, type.indexOf(" ")); // reduce to first word only - makes finding different kinds of dividends far easier
+
             if (type == "Deposit") { //Account Action
               t.newDeposit(trade);
             } else if (type == "Withdrawal") { // Accont Action
               t.newWithdrawal(trade);
-            } else if (type == "Dividend (Ordinary)" || type == "Dividend (Special)" || type == "Dividend (Bonus)") {
+            } else if (firstword == "Dividend"){
               t.newDividend(trade);
             } else { // Specific Holding Action
               t.newTrade(trade);
@@ -241,23 +230,23 @@ const app = new Vue({
         dateString: trade[1],
         orderType: trade[0],
         rawType: rawTradeType,
-        value: trade[10],
+        value: Number(trade[10]),
         // isin: trade[2],
         number: Number(trade[5]),
         price: Number(trade[6]),
         priceGBP: Number(trade[6]) / Number(trade[8]), // Price / exchange rate
         currency: trade[7],
-        exchangeRate: trade[8],
+        exchangeRate: Number(trade[8]),
         result: Number(trade[9]),
         total: Number(trade[10]),
-        withholdingTax: trade[11],
+        withholdingTax: Number(trade[11]),
         wthTaxCurrency: trade[12],
-        stampDuty: trade[14],
-        transactionFee: trade[15],
-        finraFee: trade[16],
+        stampDuty: Number(trade[14]),
+        transactionFee: Number(trade[15]),
+        finraFee: Number(trade[16]),
         notes: trade[17],
         t212ID: trade[18],
-        frenchTransactionTax: trade[19],
+        frenchTransactionTax: Number(trade[19]),
         wasFree: false,
         inLedger: 0
       };
@@ -286,20 +275,17 @@ const app = new Vue({
       }
 
       this.holdings[ticker].trades.push(temp);
-      // console.log(`Total ${ticker} trades: ${this.holdings[ticker].trades.length}`);
-      // console.log(JSON.stringify(temp));
-
 
       if (temp.rawType == "Buy") {
-        this.purchaseValue += temp.total; // Updates the global totlal purchase cost
+        if (!isNaN(temp.total)) this.purchaseValue += temp.total; // Updates the global totlal purchase cost
         //Calculate average share price
-        this.holdings[ticker].costBasis += temp.total
-        this.holdings[ticker].holdings += temp.number;
-        this.holdings[ticker].averageCostPs = temp.total;
+        // if (!isNaN(temp.total)) this.holdings[ticker].costBasis += temp.total //TODO - update this from Section 104 Holdings
+        if (!isNaN(temp.number)) this.holdings[ticker].holdings += temp.number;
+        // if (!isNaN(temp.total)) this.holdings[ticker].averageCostPs = temp.total; //TODO - update this from Section 104 Holdings
       } else {
-        this.holdings[ticker].averageCost += temp.result;
-        this.purchaseValue += temp.result;
-        this.holdings[ticker].holdings -= temp.number;
+        // if (!isNaN(temp.result)) this.holdings[ticker].averageCost += temp.result;
+        if (!isNaN(temp.result)) this.purchaseValue += temp.result;
+        if (!isNaN(temp.number)) this.holdings[ticker].holdings -= temp.number;
         this.holdings[ticker].disposalCount++;
       }
 
@@ -347,7 +333,8 @@ const app = new Vue({
         taxable: 0,
         totalPnl: 0,
         matchedUid: 0,
-        rule: ""
+        rule: "",
+        inTaxYear: 0
       }
 
       for (key in this.holdings) { // For each holding in holdings
@@ -395,12 +382,16 @@ const app = new Vue({
                   // Calculate new share number and price
                   let currNP = holding.ledger[ledgerIndex].change * holding.ledger[ledgerIndex].price; //Ledger entry current price*holdings
                   let newTradeChange = compTrade.rawType == "Buy" ? compTrade.number : -compTrade.number;
-                  let newNP = newTradeChange * compTrade.price;
+                  let newNP = Math.abs(newTradeChange) * Math.abs(compTrade.priceGBP);
+                  console.log(`3 Merge, NTChange=${newTradeChange}, NewPrice=${compTrade.priceGBP}`);
 
                   holding.ledger[ledgerIndex].change += newTradeChange; //sum of shares in this ledger entry so far
-                  holding.ledger[ledgerIndex].price = (currNP + newNP) / Math.abs(holding.ledger[ledgerIndex].change);
+                  holding.ledger[ledgerIndex].priceGBP = (currNP + newNP) / Math.abs(holding.ledger[ledgerIndex].change);
+                  console.log(`3 Merge ${compTrade.uid} - currnp=${currNP}, newNP=${newNP}, Divisor=${Math.abs(holding.ledger[ledgerIndex].change)}`);
 
                   compTrade.inLedger = 1; // trade is in ledger
+                  // If trade count is greater than 2, need to remove last merge comment
+                  if (holding.ledger[ledgerIndex].tradeCount > 2) holding.ledger[ledgerIndex].comment.pop();
                   holding.ledger[ledgerIndex].comment.push(`${holding.ledger[ledgerIndex].tradeCount} trades merged for Same Day Rule.`);
                 }
               }
