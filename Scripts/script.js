@@ -223,7 +223,7 @@ const app = new Vue({
           // Browsers that support HTML5 download attribute
           var url = URL.createObjectURL(blob);
           link.setAttribute("href", url);
-          link.setAttribute("download", "My CSV.csv");
+          link.setAttribute("download", `Trading212 Round Trips Report ${this.fyText} ${this.getDmyString(new Date())}.csv`);
           link.style.visibility = 'hidden';
           document.body.appendChild(link);
           link.click();
