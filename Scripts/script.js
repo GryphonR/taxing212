@@ -234,7 +234,7 @@ const app = new Vue({
     },
     // Calculation Methods:
     addFile() {
-      let t = this;
+      var t = this;
       let data = [];
       let dataKey = 0;
       if (localStorage.getItem("rawData") != null) {
@@ -248,21 +248,21 @@ const app = new Vue({
       let file = {
         name: "",
         data: ""
-      }
+      };
 
       file.name = localFile.name;
 
-      let uniquFile = 1;
+      let uniqueFile = 1;
 
       for (j in data) {
         if (data[j].name === file.name) {
-          uniquFile = 0;
+          uniqueFile = 0;
           alert(`${file.name}\n\nWarning: A file with this name is already loaded.\nIt has not been added again.`);
         }
       }
 
       // console.log(`File Name: ${file.name}`);
-      if (uniquFile) {
+      if (uniqueFile) {
         t.fileList.push(file.name);
         // console.log(file);
         var trades = Papa.parse(localFile, {
