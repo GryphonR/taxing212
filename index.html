@@ -12,7 +12,8 @@
 </head>
 
 <body>
-  <h1>Calc</h1>
+  <h1>Taxing 212</h1>
+  <h5>A UK capital gains tax calculator for Trading 212</h5>
   <!--
   <input id="csv" type="file">
 
@@ -25,9 +26,16 @@
 
     <div v-if="!calculated">
       <h4>Tax Year starting <input type="number" v-model="taxYear.target"></input> , {{fyText}} </h4>
+      <div v-if="fileList.length > 0" class="">
+        <p>Files Loaded:</p>
+        <template v-for="i in fileList">
+          <p>{{fileList[0]}}</p>
+        </template>
+        <p></p>
+      </div>
       <input id="fileButton" style="display:none" type="file" ref="csvFile" @change="addFile"></input><br>
       <input type="button" value="Add CSV File" onclick="document.getElementById('fileButton').click();" />
-
+      <input type="Button" name="" value="Clear Files" v-on:click="clearFiles()">
       <h1 v-if="calculating"> Calculating - {{message}} </h1>
       <button v-on:click="calculate()">Calculate</button>
     </div>
@@ -35,7 +43,8 @@
 
     <div v-if="calculated">
       <h2>Calculations for {{fyText}}</h2>
-       <button v-on:click="back()">Back</button>
+      <button v-on:click="back()">Back</button>
+      <button v-on:click="generateRoundtrips()">Download RoundTrip report for {{fyText}}</button>
 
       <h2> All Data Summary: </h2>
       <div class="holding">
@@ -145,16 +154,12 @@
               <!-- <div v-bind:class="getTradeClass(d.change)" class="trade-row"> -->
               <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-uid">{{d.uid}}</span>
               <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-date">{{getDmyString(d.timestamp)}}</span>
-              <span v-bind:class="getTradeClass(d.change)"
-                class="ledger-entry ledger-change">{{d.change.toFixed(2)}}</span>
-              <span v-bind:class="getTradeClass(d.change)"
-                class="ledger-entry ledger-price">{{d.price.toFixed(2)}}</span>
+              <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-change">{{d.change.toFixed(2)}}</span>
+              <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-price">{{d.price.toFixed(2)}}</span>
               <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-gain">{{d.gain.toFixed(2)}}</span>
               <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-loss">{{d.loss.toFixed(2)}}</span>
-              <span v-bind:class="getTradeClass(d.change)"
-                class="ledger-entry ledger-s104t">{{d.s104Total.toFixed(2)}}</span>
-              <span v-bind:class="getTradeClass(d.change)"
-                class="ledger-entry ledger-s104p">{{d.s104Price.toFixed(2)}}</span>
+              <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-s104t">{{d.s104Total.toFixed(2)}}</span>
+              <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-s104p">{{d.s104Price.toFixed(2)}}</span>
               <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-comment">
                 <template v-for="comm in d.comment">
                   <p>• {{comm}}</p>

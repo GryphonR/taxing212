@@ -10,6 +10,7 @@ var assetPrototype = {
 const app = new Vue({
   el: '#app',
   data: {
+    fileList: [],
     taxYear: {
       target: new Date().getFullYear() - 1,
       start: 0,
@@ -36,13 +37,22 @@ const app = new Vue({
     dividends: [],
     dividendsTotal: 0,
     freeShares: [],
-    holdings: {}
+    holdings: {},
+    rtHolder: ""
   },
-  mounted: function () {
-    // targetTaxYear = new Date().getFullYear();
+  mounted: function() {
+    //Check Local Storage for data:
+    this.$nextTick(function() {
+      if (localStorage.getItem("rawData") != null) {
+        let tmpFiles = JSON.parse(localStorage.getItem('rawData'));
+        for (i in tmpFiles) {
+          this.fileList.push(tmpFiles[i].name);
+        }
+      }
+    });
   },
   computed: {
-    fyText: function () {
+    fyText: function() {
       let a = Number(this.taxYear.target);
       let b = Number(this.taxYear.target) + 1;
 
@@ -75,11 +85,15 @@ const app = new Vue({
       this.calculated = 0;
       this.resetCalculations();
     },
+    clearFiles() {
+      this.fileList = {};
+      localStorage.clear();
+    },
     resetCalculations() {
       this.purchaseValue = 0;
-      this.realisedPl = 0; 
-      this.disposalCount= 0;
-        this.realisedProfit = 0;
+      this.realisedPl = 0;
+      this.disposalCount = 0;
+      this.realisedProfit = 0;
       this.realisedLoss = 0;
       this.deposits = [];
       this.withdrawals = [];
@@ -136,15 +150,96 @@ const app = new Vue({
     getDmyString(timestamp) {
       let date = new Date();
       date.setTime(timestamp);
-      return (`${date.getDate()}-${date.getMonth() + 1}-${date.getFullYear()}`);
+      let day = date.getDate() < 10 ? "0" + date.getDate() : date.getDate();
+      let month = (date.getMonth() + 1) < 10 ? "0" + (Number(date.getMonth()) + 1) : date.getMonth() + 1;
+      return (`${day}-${month}-${date.getFullYear()}`);
+    },
+    getLedgerFromUid(uid) {
+      for (i in this.holdings) {
+        let holding = this.holdings[i];
+
+        for (j in holding.ledger) {
+          let entry = holding.ledger[j];
+          if (entry.uid === uid) {
+            return (entry);
+          }
+        }
+      }
+    },
+    generateRoundtrips() {
+      // Thinking out loud...
+      // > Add headings to .csv string
+      // > Date Sold, Date Aquired, Asset, Ammount, Cost (GBP), Proceeds (GBP), Gain/Loss (GBP), Notes
+      // > Go through holdings>ledger
+      // > If disposal and in tax year, find matching buy/S104 price
+      // > Generate line.
+      // > repeat
+      let csv = "";
+      csv = csv + `Date Sold, Date Aquired, Asset, Ammount, Cost (GBP), Proceeds (GBP), Gain/Loss (GBP), Notes \n`;
+
+      for (i in this.holdings) {
+        let holding = this.holdings[i];
+
+        for (j in holding.ledger) {
+          let entry = holding.ledger[j];
+          j = Number(j);
+          if (entry.change < 0 && entry.inTaxYear) {
+            //Add to Round Trips
+            if (entry.rule === "Section 104") {
+              let dateSold = this.getDmyString(entry.timestamp);
+              let asset = holding.ticker;
+              let ammount = Math.abs(entry.change);
+              let cost = (holding.ledger[j - 1].s104Price * Math.abs(entry.change)).toFixed(2);
+              let proceeds = (entry.price * Math.abs(entry.change)).toFixed(2);
+              let gainLoss = (entry.gain - entry.loss).toFixed(2);
+              csv = csv + `${dateSold},,${asset},${ammount},${cost},${proceeds},${gainLoss},${entry.rule}\n`;
+            } else {
+              let buy = this.getLedgerFromUid(entry.matchedUid);
+              let dateSold = this.getDmyString(entry.timestamp);
+              let dateBought = this.getDmyString(buy.timestamp);
+              let asset = holding.ticker;
+              let ammount = Math.abs(entry.change);
+              let cost = (buy.price * Math.abs(entry.change)).toFixed(2);
+              let proceeds = (entry.price * Math.abs(entry.change)).toFixed(2);
+              let gainLoss = (entry.gain - entry.loss).toFixed(2);
+              csv = csv + `${dateSold},${dateBought},${asset},${ammount},${cost},${proceeds},${gainLoss},${entry.rule}\n`;
+
+            }
+
+          }
+        }
+      }
+      this.rtHolder = csv;
+
+      // now a direct copypasta from stackoverflow for the download
+      var blob = new Blob([csv], {
+        type: 'text/csv;charset=utf-8;'
+      });
+      if (navigator.msSaveBlob) { // IE 10+
+        navigator.msSaveBlob(blob, filename);
+      } else {
+        var link = document.createElement("a");
+        if (link.download !== undefined) { // feature detection
+          // Browsers that support HTML5 download attribute
+          var url = URL.createObjectURL(blob);
+          link.setAttribute("href", url);
+          link.setAttribute("download", "My CSV.csv");
+          link.style.visibility = 'hidden';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+      }
+
     },
     // Calculation Methods:
     addFile() {
+      let t = this;
       let data = [];
       let dataKey = 0;
       if (localStorage.getItem("rawData") != null) {
         data = JSON.parse(localStorage.getItem('rawData'));
-        console.log(`Files exist: ${data[0].name}`);
+        // console.log(`Files exist: ${data[0].name}`);
         dataKey = data.length - 1;
       }
 
@@ -168,9 +263,10 @@ const app = new Vue({
 
       // console.log(`File Name: ${file.name}`);
       if (uniquFile) {
+        t.fileList.push(file.name);
         // console.log(file);
         var trades = Papa.parse(localFile, {
-          complete: function (results) {
+          complete: function(results) {
             // Remove titles
             var headers = results.data.shift();
 
@@ -180,7 +276,7 @@ const app = new Vue({
             file.data = results.data;
             data.push(file);
             localStorage.setItem("rawData", JSON.stringify(data));
-            console.log(`File Data: ${JSON.stringify(file.data)}`);
+            // console.log(`File Data: ${JSON.stringify(file.data)}`);
           }
         });
       }
