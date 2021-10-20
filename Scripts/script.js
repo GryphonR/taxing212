@@ -11,6 +11,7 @@ const app = new Vue({
   el: '#app',
   data: {
     fileList: [],
+    errorList: [],
     taxYear: {
       target: new Date().getFullYear() - 1,
       start: 0,
@@ -23,8 +24,10 @@ const app = new Vue({
       realisedLoss: 0,
       disposals: 0,
       costs: 0,
-      dividends: 0
+      dividends: 0,
+      roundTrips:[],
     },
+
     calculating: 0,
     calculated: 0,
     message: "",
@@ -73,7 +76,7 @@ const app = new Vue({
       this.taxYear.start = startDate.getTime();
       this.taxYear.end = endDate.getTime();
       this.taxYear.p30 = endPlusThirty.getTime();
-
+      
       a = String(a).slice(-2);
       b = String(b).slice(-2);
       return (`${a}-${b}FY`);
@@ -86,10 +89,12 @@ const app = new Vue({
       this.resetCalculations();
     },
     clearFiles() {
-      this.fileList = {};
+      this.fileList = [];
       localStorage.clear();
     },
     resetCalculations() {
+      this.taxYear.p30Seen = 0;
+      this.errorList = [];
       this.purchaseValue = 0;
       this.realisedPl = 0;
       this.disposalCount = 0;
@@ -122,6 +127,11 @@ const app = new Vue({
       } else {
         return 'trade-row-sell';
       }
+    },
+    getIdLink(uid){
+      let text = "";
+      text = isNaN(uid) ? "" : `<a href="#${uid}">${uid}</a>`;
+      return text;
     },
     getUID() {
       return UID++;
@@ -309,30 +319,23 @@ const app = new Vue({
           }
         }
 
+        t.sortTrades(); // Organises trades by time
         t.populateLedger();
-        // console.log(`Calling calculate Disposals`);
         t.calculateDisposals();
 
         t.calculating = 0;
         t.calculated = 1;
-        // console.log(JSON.stringify(this.holdings));
-        // data = data;
-        //   }
-        // });
-        //Now calculate disposals
-
       } else {
         alert("No Files loaded - add your data and try again.");
       }
     },
     newDeposit(trade) {
       t = this;
-      // console.log(`New Deposit: `);
-      //special case for free shares:
-      if (trade[17] == "Free Shares Promotion") {
-        // t.addFreeShare(trade);
-        return;
-      }
+      // //special case for free shares:
+      // if (trade[17] == "Free Shares Promotion") {
+      //   // t.addFreeShare(trade);
+      //   return;
+      // }
       let temp = {
         uid: this.getUID(),
         timestamp: this.getTimestamp(trade[1]),
@@ -355,7 +358,7 @@ const app = new Vue({
       };
       this.withdrawals.push(temp);
     },
-    newDividend(trade) { //TODO check dividend currency and conversion rate
+    newDividend(trade) { 
       let temp = {
         uid: this.getUID(),
         ticker: trade[3],
@@ -397,7 +400,6 @@ const app = new Vue({
         number: Number(trade[5]),
         price: Number(trade[6]),
         priceGBP: Number(trade[6]) / Number(trade[8]), // Price / exchange rate
-        currency: trade[7],
         exchangeRate: Number(trade[8]),
         result: Number(trade[9]),
         total: Number(trade[10]),
@@ -445,16 +447,27 @@ const app = new Vue({
       if (temp.rawType == "Buy") {
         //Calculate average share price
         if (!isNaN(temp.number)) this.holdings[ticker].holdings += temp.number;
-        // if (!isNaN(temp.total)) this.holdings[ticker].averageCostPs = temp.total; //TODO - update this from Section 104 Holdings
       } else {
-        // if (!isNaN(temp.result)) this.holdings[ticker].averageCost += temp.result;
         if (!isNaN(temp.number)) this.holdings[ticker].holdings -= temp.number;
         this.holdings[ticker].disposalCount++;
       }
 
     },
+    sortTrades(){ 
+      // if csv files aren't in chronological order, trades won't be, but 
+      // following calculations rely on them being in order
+      for(i in this.holdings){
+        let holding = this.holdings[i];
+        holding.trades.sort(function (a, b) {
+          return a.timestamp - b.timestamp;
+        });
+      }
+
+      // lets sort holdings by first trade date too:
+      this.holdings = Object.fromEntries(Object.entries(this.holdings).sort(([,a], [,b]) => a.trades[0].timestamp - b.trades[0].timestamp ));
+
+    },
     populateLedger() {
-      this.message = "Populating Ledger";
       // Create an individual ledger for each holding. This applies the same day rule.
       // Multiple buy or multiple sells on the same day will be combined into one ledger entry.
       /*
@@ -476,27 +489,21 @@ const app = new Vue({
         timestamp: 0,
         change: 0, //Change in share holdings, +ve is buy, -ve is sell
         price: 0, // Price at which change occured
-        currency: "",
         exchangeRate: 0,
-        totalGBP: 0,
-        feesPaid: 0,
-        txid: 0,
-        tradeCount: 0,
-        tradeIDs: [],
-        // comment: "", //TODO make array to hold multiple comments
-        comment: [], //TODO make array to hold multiple comments
+        tradeCount: 0, // Count of trades combined into one entry in accordance with same day rule
+        tradeIDs: [], // ID's of trades combined into one entry in accordance with same day rule
+        comment: [],
         counted: 0, // Has this ledger entry already been accounted for in tax calculations.
-        // split: 0, // Does the tax in this entry fall into more than one category
-        // subledger: [], // If split, breakdown transactions go in here
         gain: 0,
         loss: 0,
+        totalPnl: 0,
         s104Total: 0,
         s104Price: 0,
         taxable: 0,
-        totalPnl: 0,
-        matchedUid: 0,
-        rule: "",
-        inTaxYear: 0
+        matchedUid: "", //UID of the buy or sell this entry is counted against
+        rule: "", // "Same Day", "30 day BnB" or "Section 104"
+        inTaxYear: 0, // Bool, is trade in selected tax year
+        sdltPaid: 0 // True or false if SDLT was paid on a buy
       }
 
       for (key in this.holdings) { // For each holding in holdings
@@ -837,13 +844,14 @@ const app = new Vue({
                 entry.s104Price = entry.price;
               } else {
                 entry.s104Total = Number(holding.ledger[i - 1].s104Total) + Number(entry.change);
-
+                
                 // let prevValue = holding.ledger[i - 1].s104Total * holding.ledger[i - 1].s104Price;
                 // let newValue = Number(entry.change) * Number(entry.price)
-
+                
                 entry.s104Price = ((Number(holding.ledger[i - 1].s104Total) * Number(holding.ledger[i - 1].s104Price)) + (Number(entry.change) * Number(entry.price))) / Number(entry.s104Total);
-
+                
               }
+              entry.comment.push('Added to Section 104 holdings.');
             } else if (i > 0) {
               entry.s104Total = Number(holding.ledger[i - 1].s104Total);
               entry.s104Price = Number(holding.ledger[i - 1].s104Price);
@@ -852,7 +860,16 @@ const app = new Vue({
             if (!entry.counted) {
               // Selling section 104 holding
               if (i === 0) {
-                console.log(`Error - no history of holdings for disposal ${entry.uid} of ${holding.name}`);
+                console.log(`Error - no history of holdings for disposal #${entry.uid} of ${holding.name}`);
+                this.errorList.push({
+                  msg:`Error - no history of holdings for disposal #${entry.uid} of ${holding.name}.`,
+                  linkedUid: entry.uid
+                });
+              } else if (Number(Math.abs(entry.change).toFixed(2)) > Number((holding.ledger[i - 1].s104Total).toFixed(2)) ){// Only compare to two significant figures, fractional shares cause some confusion otherwise.
+                this.errorList.push({
+                  msg:`Error - Sale exceeds S401 Holdings for disposal ${entry.uid} of ${holding.name}.`,
+                  linkedUid: entry.uid
+                });
               } else {
                 let tmp = (Math.abs(entry.change) * Number(entry.price)) - (Math.abs(entry.change) * Number(holding.ledger[i - 1].s104Price));
                 entry.s104Total = (Number(holding.ledger[i - 1].s104Total) - Math.abs(entry.change));
@@ -888,6 +905,11 @@ const app = new Vue({
           }
           if (entry.timestamp > this.taxYear.p30) { // A check that the data goes past the 30 days required to identify bnb trades
             this.taxYear.p30Seen = 1;
+            // let d1 = new Date();
+            // let d2 = new Date();
+            // d1.setTime(entry.timestamp);
+            // d2.setTime(this.taxYear.p30);
+            // console.log(`P30 Seen @${entry.uid}, ${d1}, ${d2}`)
           }
 
 
@@ -914,10 +936,17 @@ const app = new Vue({
         this.realisedLoss += Number(holding.realisedLoss);
         this.realisedProfit += Number(holding.realisedProfit);
         this.disposalCount += Number(holding.disposalCount);
-
-
-
-        //error p30 check
+        
+      }
+      //error p30 check
+      if (!this.taxYear.p30Seen){
+        console.log(`Caution - No data seen past the end of the tax year +30 days. This period is required for the 30 day BnB calculations if applicable`)
+        this.errorList.push(
+          {
+            msg:`Caution - No data seen past the end of the tax year +30 days. This period is required for the 30 day BnB calculations if applicable`,
+            linkedUid:""
+          }
+      );
       }
     }
   }

@@ -25,7 +25,8 @@
 
 
     <div v-if="!calculated">
-      <p>1) Load your T212 trade history CSV files. For accurate results full history is required to calculate Section 104 Holdings prices</p>
+      <p>1) Load your T212 trade history CSV files. For accurate results full history is required to 
+        calculate Section 104 Holdings prices.</p>
       <div v-if="fileList.length > 0" class="">
         <p>Files Loaded:</p>
         <template v-for="i in fileList">
@@ -49,6 +50,18 @@
       <h2>Calculations for {{fyText}}</h2>
       <button v-on:click="back()">Back</button>
       <button v-on:click="generateRoundtrips()">Download RoundTrip report for {{fyText}}</button>
+
+
+      <div v-if="errorList.length > 0">
+      <h2>Errors Detected:</h2>
+      <p>Errors were found during calculations - normally caused by missing data. Fix or understand these before proceeding.</p>
+      <template v-for="error in errorList">
+        <div class="holding">
+          {{error.msg}} 
+          <span v-if="Number(error.linkedUid)">(GoTo:<span v-html="getIdLink(error.linkedUid)"></span>)</span>
+        </div>
+      </template>
+      </div>
 
       <h2> All Data Summary: </h2>
       <div class="holding">
@@ -88,7 +101,7 @@
       <h2> Deposits </h2>
       <template v-for="dep in deposits">
         <div class="holding">
-          {{dep.dateString}}: £{{dep.value}} U#{{dep.uid}}
+          {{getDmyString(dep.timestamp)}}: £{{dep.value}}
         </div>
       </template>
 
@@ -96,14 +109,14 @@
       <h2> Withdrawals </h2>
       <template v-for="itm in withdrawals">
         <div class="holding">
-          {{itm.dateString}}: £{{itm.value}}
+          {{getDmyString(itm.timestamp)}}: £{{itm.value}}
         </div>
       </template>
 
       <h2> Dividends </h2>
       <template v-for="itm in dividends">
         <div class="holding">
-          {{itm.dateString}}, {{itm.name}}({{itm.ticker}}) £{{itm.value}}
+          {{getDmyString(itm.timestamp)}}: {{itm.name}}({{itm.ticker}}) £{{itm.value}}
         </div>
       </template>
 
@@ -151,12 +164,12 @@
             <span class="ledger-entry ledger-loss">Loss £</span>
             <span class="ledger-entry ledger-s104t">S104 Holdings</span>
             <span class="ledger-entry ledger-s104p">S104 Price</span>
-            <span class="ledger-entry ledger-comment"></span>
+            <span class="ledger-entry ledger-comment">Comment</span>
             <!-- </div> -->
             <template v-for="d in inst.ledger">
               <!-- {{JSON.stringify(d)}} -->
               <!-- <div v-bind:class="getTradeClass(d.change)" class="trade-row"> -->
-              <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-uid">{{d.uid}}</span>
+              <span v-bind:class="getTradeClass(d.change)" v-bind:id="d.uid" class="ledger-entry ledger-uid">{{d.uid}}</span>
               <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-date">{{getDmyString(d.timestamp)}}</span>
               <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-change">{{d.change.toFixed(2)}}</span>
               <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-price">{{d.price.toFixed(2)}}</span>
@@ -166,7 +179,7 @@
               <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-s104p">{{d.s104Price.toFixed(2)}}</span>
               <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-comment">
                 <template v-for="comm in d.comment">
-                  <p>• {{comm}}</p>
+                  <p>{{comm}}</p>
                 </template>
               </span>
               <!-- </div> -->

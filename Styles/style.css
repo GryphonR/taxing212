@@ -88,6 +88,11 @@ body{
 }
 .ledger-s104p{
   grid-column: 8;
+  
+}
+
+.ledger-comment{
+  grid-column: 9 / 13;
 
 }
 
@@ -128,7 +133,3 @@ body{
   grid-column: 12;
 }
 
-.ledger-comment{
-  grid-column: 9 / 13;
-
-}
