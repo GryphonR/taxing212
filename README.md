@@ -1,7 +1,7 @@
 # Taxing212
 WORK IN PROGRESS - UK Capital Gains Calculator for Trading212
 
-(Semi) Functional site here: https://rjpgriffin.github.io/taxing212/
+(Semi) Functional site here: https://gryphonr.github.io/taxing212/
 
 This is very much a work in progress, started because Trading 212 don't give account statements that calculate gains and losses in accordance with UK Tax law - specifically the same day rule and the 30 day bed and breakfasting rule.
 
