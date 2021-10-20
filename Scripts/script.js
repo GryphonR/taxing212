@@ -762,7 +762,7 @@ const app = new Vue({
                     sellCopy.change = Number(sellCopy.change) - Number(sell.change);
                     sell.counted = 1;
                     buy.counted = 1;
-                    buy.comment.push(`30 day BnB rule, counted against Sell #${sellCopy.uid}`);
+                    buy.comment.push(`30 day BnB rule, counted against Sell #${sell.uid}`);
                     sell.comment.push(`Entry split into #${sellCopy.uid} for 30 day rule matching Buy entry #${buy.uid}`);
 
 
@@ -883,6 +883,7 @@ const app = new Vue({
                 entry.totalPnl = tmp;
                 entry.taxable = 1;
                 entry.matchedUid = buy.uid;
+                entry.s104Price = holding.ledger[i - 1].s104Price;
 
                 entry.comment.push(`Gain calculated against Section 104 Holdings`);
               }
