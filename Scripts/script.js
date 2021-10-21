@@ -25,7 +25,7 @@ const app = new Vue({
       disposals: 0,
       costs: 0,
       dividends: 0,
-      roundTrips:[],
+      roundTrips: [],
     },
 
     calculating: 0,
@@ -43,9 +43,9 @@ const app = new Vue({
     holdings: {},
     rtHolder: ""
   },
-  mounted: function() {
+  mounted: function () {
     //Check Local Storage for data:
-    this.$nextTick(function() {
+    this.$nextTick(function () {
       if (localStorage.getItem("rawData") != null) {
         let tmpFiles = JSON.parse(localStorage.getItem('rawData'));
         for (i in tmpFiles) {
@@ -55,7 +55,7 @@ const app = new Vue({
     });
   },
   computed: {
-    fyText: function() {
+    fyText: function () {
       let a = Number(this.taxYear.target);
       let b = Number(this.taxYear.target) + 1;
 
@@ -76,7 +76,7 @@ const app = new Vue({
       this.taxYear.start = startDate.getTime();
       this.taxYear.end = endDate.getTime();
       this.taxYear.p30 = endPlusThirty.getTime();
-      
+
       a = String(a).slice(-2);
       b = String(b).slice(-2);
       return (`${a}-${b}FY`);
@@ -111,7 +111,8 @@ const app = new Vue({
         realisedLoss: 0,
         disposals: 0,
         costs: 0,
-        dividends: 0
+        dividends: 0,
+        roundTrips: []
       };
     },
     //Housekeeping Methods:
@@ -128,7 +129,7 @@ const app = new Vue({
         return 'trade-row-sell';
       }
     },
-    getIdLink(uid){
+    getIdLink(uid) {
       let text = "";
       text = isNaN(uid) ? "" : `<a href="#${uid}">${uid}</a>`;
       return text;
@@ -150,6 +151,14 @@ const app = new Vue({
         return true;
       }
 
+    },
+    inTaxYear(timestamp) {
+      // tax year check
+      if (timestamp >= this.taxYear.start && timestamp <= this.taxYear.end) {
+        return 1;
+      }else{
+        return 0;
+      }
     },
     getTimestamp(date) { // Takes in a datestring returns UTC Seconds
       // console.log(date);
@@ -184,8 +193,6 @@ const app = new Vue({
       // > If disposal and in tax year, find matching buy/S104 price
       // > Generate line.
       // > repeat
-      let csv = "";
-      csv = csv + `Date Sold, Date Aquired, Asset, Ammount, Cost (GBP), Proceeds (GBP), Gain/Loss (GBP), Notes \n`;
 
       for (i in this.holdings) {
         let holding = this.holdings[i];
@@ -193,33 +200,40 @@ const app = new Vue({
         for (j in holding.ledger) {
           let entry = holding.ledger[j];
           j = Number(j);
-          if (entry.change < 0 && entry.inTaxYear) {
+          if (entry.taxable && entry.inTaxYear) {
+            let trip = {};
             //Add to Round Trips
             if (entry.rule === "Section 104") {
-              let dateSold = this.getDmyString(entry.timestamp);
-              let asset = holding.ticker;
-              let ammount = Math.abs(entry.change);
-              let cost = (holding.ledger[j - 1].s104Price * Math.abs(entry.change)).toFixed(2);
-              let proceeds = (entry.price * Math.abs(entry.change)).toFixed(2);
-              let gainLoss = (entry.gain - entry.loss).toFixed(2);
-              csv = csv + `${dateSold},,${asset},${ammount},${cost},${proceeds},${gainLoss},${entry.rule}\n`;
+              trip.dateBought = "";
+              trip.cost = (holding.ledger[j - 1].s104Price * Math.abs(entry.change)).toFixed(2);
             } else {
               let buy = this.getLedgerFromUid(entry.matchedUid);
-              let dateSold = this.getDmyString(entry.timestamp);
-              let dateBought = this.getDmyString(buy.timestamp);
-              let asset = holding.ticker;
-              let ammount = Math.abs(entry.change);
-              let cost = (buy.price * Math.abs(entry.change)).toFixed(2);
-              let proceeds = (entry.price * Math.abs(entry.change)).toFixed(2);
-              let gainLoss = (entry.gain - entry.loss).toFixed(2);
-              csv = csv + `${dateSold},${dateBought},${asset},${ammount},${cost},${proceeds},${gainLoss},${entry.rule}\n`;
-
+              trip.dateBought = this.getDmyString(buy.timestamp);
+              trip.cost = (buy.price * Math.abs(entry.change)).toFixed(2);
             }
 
+            trip.dateSold = this.getDmyString(entry.timestamp);
+            trip.asset = holding.ticker;
+            trip.ammount = Math.abs(entry.change);
+            trip.proceeds = (entry.price * Math.abs(entry.change)).toFixed(2);
+            trip.gainLoss = (entry.gain - entry.loss).toFixed(2);
+            trip.note = entry.rule;
+
+            this.taxYearData.roundTrips.push(trip);
           }
         }
       }
-      this.rtHolder = csv;
+      // Now sort trips by date      
+
+    },
+    downloadRoundTrips() {
+      let csv = "";
+      csv = csv + `Date Sold, Date Aquired, Asset, Ammount, Cost (GBP), Proceeds (GBP), Gain/Loss (GBP), Notes \n`;
+      
+      for (i in this.taxYearData.roundTrips) {
+        let rt = this.taxYearData.roundTrips[i];
+          csv = csv + `${rt.dateSold},${rt.dateBought},${rt.asset},${rt.ammount},${rt.cost},${rt.proceeds},${rt.gainLoss},${rt.note}\n`;
+      }
 
       // now a direct copypasta from stackoverflow for the download
       var blob = new Blob([csv], {
@@ -240,7 +254,6 @@ const app = new Vue({
           document.body.removeChild(link);
         }
       }
-
     },
     // Calculation Methods:
     addFile() {
@@ -276,7 +289,7 @@ const app = new Vue({
         t.fileList.push(file.name);
         // console.log(file);
         var trades = Papa.parse(localFile, {
-          complete: function(results) {
+          complete: function (results) {
             // Remove titles
             var headers = results.data.shift();
 
@@ -322,6 +335,7 @@ const app = new Vue({
         t.sortTrades(); // Organises trades by time
         t.populateLedger();
         t.calculateDisposals();
+        t.generateRoundtrips()
 
         t.calculating = 0;
         t.calculated = 1;
@@ -358,7 +372,7 @@ const app = new Vue({
       };
       this.withdrawals.push(temp);
     },
-    newDividend(trade) { 
+    newDividend(trade) {
       let temp = {
         uid: this.getUID(),
         ticker: trade[3],
@@ -366,7 +380,7 @@ const app = new Vue({
         timestamp: this.getTimestamp(trade[1]),
         dateString: trade[1],
         value: Number(trade[10]),
-        inTaxYear: 0
+        inTaxYear: this.inTaxYear(this.getTimestamp(trade[1])),
       };
       //If in tax year, add to tax year data
       if (temp.timestamp >= this.taxYear.start && temp.timestamp <= this.taxYear.end) {
@@ -453,10 +467,10 @@ const app = new Vue({
       }
 
     },
-    sortTrades(){ 
+    sortTrades() {
       // if csv files aren't in chronological order, trades won't be, but 
       // following calculations rely on them being in order
-      for(i in this.holdings){
+      for (i in this.holdings) {
         let holding = this.holdings[i];
         holding.trades.sort(function (a, b) {
           return a.timestamp - b.timestamp;
@@ -464,7 +478,7 @@ const app = new Vue({
       }
 
       // lets sort holdings by first trade date too:
-      this.holdings = Object.fromEntries(Object.entries(this.holdings).sort(([,a], [,b]) => a.trades[0].timestamp - b.trades[0].timestamp ));
+      this.holdings = Object.fromEntries(Object.entries(this.holdings).sort(([, a], [, b]) => a.trades[0].timestamp - b.trades[0].timestamp));
 
     },
     populateLedger() {
@@ -844,12 +858,12 @@ const app = new Vue({
                 entry.s104Price = entry.price;
               } else {
                 entry.s104Total = Number(holding.ledger[i - 1].s104Total) + Number(entry.change);
-                
+
                 // let prevValue = holding.ledger[i - 1].s104Total * holding.ledger[i - 1].s104Price;
                 // let newValue = Number(entry.change) * Number(entry.price)
-                
+
                 entry.s104Price = ((Number(holding.ledger[i - 1].s104Total) * Number(holding.ledger[i - 1].s104Price)) + (Number(entry.change) * Number(entry.price))) / Number(entry.s104Total);
-                
+
               }
               entry.comment.push('Added to Section 104 holdings.');
             } else if (i > 0) {
@@ -862,12 +876,12 @@ const app = new Vue({
               if (i === 0) {
                 console.log(`Error - no history of holdings for disposal #${entry.uid} of ${holding.name}`);
                 this.errorList.push({
-                  msg:`Error - no history of holdings for disposal #${entry.uid} of ${holding.name}.`,
+                  msg: `Error - no history of holdings for disposal #${entry.uid} of ${holding.name}.`,
                   linkedUid: entry.uid
                 });
-              } else if (Number(Math.abs(entry.change).toFixed(2)) > Number((holding.ledger[i - 1].s104Total).toFixed(2)) ){// Only compare to two significant figures, fractional shares cause some confusion otherwise.
+              } else if (Number(Math.abs(entry.change).toFixed(2)) > Number((holding.ledger[i - 1].s104Total).toFixed(2))) {// Only compare to two significant figures, fractional shares cause some confusion otherwise.
                 this.errorList.push({
-                  msg:`Error - Sale exceeds S401 Holdings for disposal ${entry.uid} of ${holding.name}.`,
+                  msg: `Error - Sale exceeds S401 Holdings for disposal ${entry.uid} of ${holding.name}.`,
                   linkedUid: entry.uid
                 });
               } else {
@@ -901,9 +915,11 @@ const app = new Vue({
           entry = holding.ledger[i];
 
           // tax year check
-          if (entry.timestamp >= this.taxYear.start && entry.timestamp <= this.taxYear.end) {
-            entry.inTaxYear = 1;
-          }
+          // if (entry.timestamp >= this.taxYear.start && entry.timestamp <= this.taxYear.end) {
+          //   entry.inTaxYear = 1;
+          // }
+          entry.inTaxYear = this.inTaxYear(entry.timestamp);
+
           if (entry.timestamp > this.taxYear.p30) { // A check that the data goes past the 30 days required to identify bnb trades
             this.taxYear.p30Seen = 1;
             // let d1 = new Date();
@@ -937,17 +953,17 @@ const app = new Vue({
         this.realisedLoss += Number(holding.realisedLoss);
         this.realisedProfit += Number(holding.realisedProfit);
         this.disposalCount += Number(holding.disposalCount);
-        
+
       }
       //error p30 check
-      if (!this.taxYear.p30Seen){
+      if (!this.taxYear.p30Seen) {
         console.log(`Caution - No data seen past the end of the tax year +30 days. This period is required for the 30 day BnB calculations if applicable`)
         this.errorList.push(
           {
-            msg:`Caution - No data seen past the end of the tax year +30 days. This period is required for the 30 day BnB calculations if applicable`,
-            linkedUid:""
+            msg: `Caution - No data seen past the end of the tax year +30 days. This period is required for the 30 day BnB calculations if applicable`,
+            linkedUid: ""
           }
-      );
+        );
       }
     }
   }
