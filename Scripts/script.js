@@ -24,6 +24,7 @@ const app = new Vue({
       realisedLoss: 0,
       disposals: 0,
       costs: 0,
+      proceeds: 0,
       dividends: 0,
       roundTrips: [],
     },
@@ -43,9 +44,9 @@ const app = new Vue({
     holdings: {},
     rtHolder: ""
   },
-  mounted: function () {
+  mounted: function() {
     //Check Local Storage for data:
-    this.$nextTick(function () {
+    this.$nextTick(function() {
       if (localStorage.getItem("rawData") != null) {
         let tmpFiles = JSON.parse(localStorage.getItem('rawData'));
         for (i in tmpFiles) {
@@ -55,7 +56,7 @@ const app = new Vue({
     });
   },
   computed: {
-    fyText: function () {
+    fyText: function() {
       let a = Number(this.taxYear.target);
       let b = Number(this.taxYear.target) + 1;
 
@@ -111,6 +112,7 @@ const app = new Vue({
         realisedLoss: 0,
         disposals: 0,
         costs: 0,
+        proceeds: 0,
         dividends: 0,
         roundTrips: []
       };
@@ -156,7 +158,7 @@ const app = new Vue({
       // tax year check
       if (timestamp >= this.taxYear.start && timestamp <= this.taxYear.end) {
         return 1;
-      }else{
+      } else {
         return 0;
       }
     },
@@ -213,6 +215,7 @@ const app = new Vue({
             }
 
             trip.dateSold = this.getDmyString(entry.timestamp);
+            trip.timestamp = entry.timestamp;
             trip.asset = holding.ticker;
             trip.ammount = Math.abs(entry.change);
             trip.proceeds = (entry.price * Math.abs(entry.change)).toFixed(2);
@@ -223,16 +226,32 @@ const app = new Vue({
           }
         }
       }
-      // Now sort trips by date      
+      // Now sort trips by date
+      this.taxYearData.roundTrips.sort(function(a, b) {
+        return a.timestamp - b.timestamp;
+      });
+
+      let acquisitionCost = 0;
+      let proceeds = 0;
+      //Calculate tax year total proceeds and aqisition costs
+      for (i in this.taxYearData.roundTrips) {
+        trip = this.taxYearData.roundTrips[i];
+        acquisitionCost += Number(trip.cost);
+        console.log(`Acquistion Cost: ${acquisitionCost}, ${trip.cost}`);
+        proceeds += Number(trip.proceeds);
+      }
+
+      this.taxYearData.proceeds = proceeds;
+      this.taxYearData.costs = acquisitionCost;
 
     },
     downloadRoundTrips() {
       let csv = "";
       csv = csv + `Date Sold, Date Aquired, Asset, Ammount, Cost (GBP), Proceeds (GBP), Gain/Loss (GBP), Notes \n`;
-      
+
       for (i in this.taxYearData.roundTrips) {
         let rt = this.taxYearData.roundTrips[i];
-          csv = csv + `${rt.dateSold},${rt.dateBought},${rt.asset},${rt.ammount},${rt.cost},${rt.proceeds},${rt.gainLoss},${rt.note}\n`;
+        csv = csv + `${rt.dateSold},${rt.dateBought},${rt.asset},${rt.ammount},${rt.cost},${rt.proceeds},${rt.gainLoss},${rt.note}\n`;
       }
 
       // now a direct copypasta from stackoverflow for the download
@@ -289,7 +308,7 @@ const app = new Vue({
         t.fileList.push(file.name);
         // console.log(file);
         var trades = Papa.parse(localFile, {
-          complete: function (results) {
+          complete: function(results) {
             // Remove titles
             var headers = results.data.shift();
 
@@ -468,11 +487,11 @@ const app = new Vue({
 
     },
     sortTrades() {
-      // if csv files aren't in chronological order, trades won't be, but 
+      // if csv files aren't in chronological order, trades won't be, but
       // following calculations rely on them being in order
       for (i in this.holdings) {
         let holding = this.holdings[i];
-        holding.trades.sort(function (a, b) {
+        holding.trades.sort(function(a, b) {
           return a.timestamp - b.timestamp;
         });
       }
@@ -879,7 +898,7 @@ const app = new Vue({
                   msg: `Error - no history of holdings for disposal #${entry.uid} of ${holding.name}.`,
                   linkedUid: entry.uid
                 });
-              } else if (Number(Math.abs(entry.change).toFixed(2)) > Number((holding.ledger[i - 1].s104Total).toFixed(2))) {// Only compare to two significant figures, fractional shares cause some confusion otherwise.
+              } else if (Number(Math.abs(entry.change).toFixed(2)) > Number((holding.ledger[i - 1].s104Total).toFixed(2))) { // Only compare to two significant figures, fractional shares cause some confusion otherwise.
                 this.errorList.push({
                   msg: `Error - Sale exceeds S401 Holdings for disposal ${entry.uid} of ${holding.name}.`,
                   linkedUid: entry.uid
@@ -958,12 +977,10 @@ const app = new Vue({
       //error p30 check
       if (!this.taxYear.p30Seen) {
         console.log(`Caution - No data seen past the end of the tax year +30 days. This period is required for the 30 day BnB calculations if applicable`)
-        this.errorList.push(
-          {
-            msg: `Caution - No data seen past the end of the tax year +30 days. This period is required for the 30 day BnB calculations if applicable`,
-            linkedUid: ""
-          }
-        );
+        this.errorList.push({
+          msg: `Caution - No data seen past the end of the tax year +30 days. This period is required for the 30 day BnB calculations if applicable`,
+          linkedUid: ""
+        });
       }
     }
   }
