@@ -1,9 +1,11 @@
 # Taxing212
-WORK IN PROGRESS - UK Capital Gains Calculator for Trading212
+UK Capital Gains Calculator for Trading212
 
-(Semi) Functional site here: https://gryphonr.github.io/taxing212/
+Functional site here: https://gryphonr.github.io/taxing212/
 
-This is very much a work in progress, started because Trading 212 don't give account statements that calculate gains and losses in accordance with UK Tax law - specifically the same day rule and the 30 day bed and breakfasting rule.
+This started because Trading 212 don't give account statements that calculate gains and losses in accordance with UK Tax law - specifically the same day rule and the 30 day bed and breakfasting rule. 
+
+If you find any issues or mistakes in the calculations please raise a github issue!
 
 Aim: a simple to use website that converts the CSV trade history that Trading212 suplies into a useful tax year (and all time) overiew, providing all the information required for a Self Assessment form (However I'll emphasize that the results given from this site are assumed to be incorrect! - and certinaly are at the moment)
 
