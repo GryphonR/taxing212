@@ -217,7 +217,7 @@ const app = new Vue({
             trip.dateSold = this.getDmyString(entry.timestamp);
             trip.timestamp = entry.timestamp;
             trip.asset = holding.ticker;
-            trip.ammount = Math.abs(entry.change);
+            trip.amount = Math.abs(entry.change);
             trip.proceeds = (entry.price * Math.abs(entry.change)).toFixed(2);
             trip.gainLoss = (entry.gain - entry.loss).toFixed(2);
             trip.note = entry.rule;
@@ -247,11 +247,11 @@ const app = new Vue({
     },
     downloadRoundTrips() {
       let csv = "";
-      csv = csv + `Date Sold, Date Aquired, Asset, Ammount, Cost (GBP), Proceeds (GBP), Gain/Loss (GBP), Notes \n`;
+      csv = csv + `Date Sold, Date Aquired, Asset, Amount, Cost (GBP), Proceeds (GBP), Gain/Loss (GBP), Notes \n`;
 
       for (i in this.taxYearData.roundTrips) {
         let rt = this.taxYearData.roundTrips[i];
-        csv = csv + `${rt.dateSold},${rt.dateBought},${rt.asset},${rt.ammount},${rt.cost},${rt.proceeds},${rt.gainLoss},${rt.note}\n`;
+        csv = csv + `${rt.dateSold},${rt.dateBought},${rt.asset},${rt.amount},${rt.cost},${rt.proceeds},${rt.gainLoss},${rt.note}\n`;
       }
 
       // now a direct copypasta from stackoverflow for the download
