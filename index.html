@@ -208,7 +208,7 @@
               <span class="ledger-entry ledger-title c1">Date Sold</span>
               <span class="ledger-entry ledger-title c2">Date Aquired</span>
               <span class="ledger-entry ledger-title c3">Asset</span>
-              <span class="ledger-entry ledger-title c4">Ammount</span>
+              <span class="ledger-entry ledger-title c4">Amount</span>
               <span class="ledger-entry ledger-title c5">Cost £</span>
               <span class="ledger-entry ledger-title c6">Proceeds £</span>
               <span class="ledger-entry ledger-title c7">P/L £</span>
@@ -218,7 +218,7 @@
                   <span v-bind:class="getTradeClass(t.gainLoss)" class="ledger-entry c1">{{t.dateSold}}</span>
                   <span v-bind:class="getTradeClass(t.gainLoss)" class="ledger-entry c2">{{t.dateBought}}</span>
                   <span v-bind:class="getTradeClass(t.gainLoss)" class="ledger-entry c3">{{t.asset}}</span>
-                  <span v-bind:class="getTradeClass(t.gainLoss)" class="ledger-entry c4">{{t.ammount.toFixed(2)}}</span>
+                  <span v-bind:class="getTradeClass(t.gainLoss)" class="ledger-entry c4">{{t.amount.toFixed(2)}}</span>
                   <span v-bind:class="getTradeClass(t.gainLoss)" class="ledger-entry c5">{{t.cost}}</span>
                   <span v-bind:class="getTradeClass(t.gainLoss)" class="ledger-entry c6">{{t.proceeds}}</span>
                   <span v-bind:class="getTradeClass(t.gainLoss)" class="ledger-entry c7">{{t.gainLoss}}</span>
