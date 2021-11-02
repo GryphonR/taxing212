@@ -184,18 +184,119 @@
           </div>
 
           <div class="summary-master-container">
-            <div v-if="dividends.length" class="dividends-container g3">
+            <div v-if="dividends.length" class="dividends-container g4">
               <h2 class="summary-box-title"> Dividends </h2>
+              <h4 class="summary-box-subheading">Tax Year Dividends Summary</h4>
+              <h5 class="c1">
+                Uk Companies Total
+              </h5>
+              <h5 class="c2">
+                Uk Other (Funds/Trusts) Total
+              </h5>
+              <h5 class="c3">
+                Foreign Total
+              </h5>
+              <h5 class="c4">
+                Foreign Taxes Paid
+              </h5>
+              <div class="c1">
+                £{{divTyUkC}}
+              </div>
+              <div class="c2">
+                £{{divTyUkO}}
+              </div>
+              <div class="c3">
+                £{{dividendDetails.nonUk.toFixed(2)}}
+              </div>
+              <div class="c4">
+                £{{dividendDetails.taxPaid.toFixed(2)}}
+              </div>
+              <h4 class="summary-box-subheading">Uk Company Dividends</h4>
+              <h5 class="c1">
+                Date Received
+              </h5>
+              <h5 class="c2">
+                Name
+              </h5>
+              <h5 class="c3">
+                Value
+              </h5>
+              <h5 class="c4">
+                UK Company?
+              </h5>
               <template v-for="itm in dividends">
-                <div class="summary-item c1">
+                <!-- <div v-if="itm.isUk && itm.ukCompany"> -->
+                <div v-if="itm.isUk && itm.ukCompany" class="summary-item c1">
                   {{getDmyString(itm.timestamp)}} <span v-if="itm.inTaxYear">*</span>
                 </div>
-                <div class="summary-item c2">
+                <div v-if="itm.isUk && itm.ukCompany" class="summary-item c2">
                   {{itm.name}}({{itm.ticker}})
                 </div>
-                <div class="summary-item c3">
+                <div v-if="itm.isUk && itm.ukCompany" class="summary-item c3">
                   £{{itm.value}}
                 </div>
+                <div v-if="itm.isUk && itm.ukCompany" class="summary-item c4">
+                  <input type="checkbox" id="checkbox" v-model="itm.ukCompany">
+                </div>
+                <!-- </div> -->
+              </template>
+              <h4 class="summary-box-subheading">Other UK Dividends</h4>
+              <h5 class="c1">
+                Date Received
+              </h5>
+              <h5 class="c2">
+                Name
+              </h5>
+              <h5 class="c3">
+                Value
+              </h5>
+              <h5 class="c4">
+                UK Company?
+              </h5>
+              <template v-for="itm in dividends">
+
+                <div v-if="itm.isUk && !itm.ukCompany" class="summary-item c1">
+                  {{getDmyString(itm.timestamp)}} <span v-if="itm.inTaxYear">*</span>
+                </div>
+                <div v-if="itm.isUk && !itm.ukCompany" class="summary-item c2">
+                  {{itm.name}}({{itm.ticker}})
+                </div>
+                <div v-if="itm.isUk && !itm.ukCompany" class="summary-item c3">
+                  £{{itm.value}}
+                </div>
+                <div v-if="itm.isUk && !itm.ukCompany" class="summary-item c4">
+                  <input type="checkbox" id="checkbox" v-model="itm.ukCompany">
+                </div>
+
+              </template>
+              <h4 class="summary-box-subheading">Non-UK Dividends</h4>
+              <h5 class="c1">
+                Date Received
+              </h5>
+              <h5 class="c2">
+                Name
+              </h5>
+              <h5 class="c3">
+                Value
+              </h5>
+              <h5 class="c4">
+                Tax Paid
+              </h5>
+              <template v-for="itm in dividends">
+
+                <div v-if="!itm.isUk" class="summary-item c1">
+                  {{getDmyString(itm.timestamp)}} <span v-if="itm.inTaxYear">*</span>
+                </div>
+                <div v-if="!itm.isUk" class="summary-item c2">
+                  {{itm.name}}({{itm.ticker}})
+                </div>
+                <div v-if="!itm.isUk" class="summary-item c3">
+                  £{{itm.value}}
+                </div>
+                <div v-if="!itm.isUk" class="summary-item c4">
+                  £{{itm.taxPaidGBP.toFixed(2)}}
+                </div>
+
               </template>
             </div>
             <p>* in Tax Year {{fyText}}</p>
@@ -205,14 +306,14 @@
           <div class="holding">
             <h2 class="section-title">{{fyText}} Round Trips</h2>
             <div class="round-trip-container">
-              <span class="ledger-entry ledger-title c1">Date Sold</span>
-              <span class="ledger-entry ledger-title c2">Date Aquired</span>
-              <span class="ledger-entry ledger-title c3">Asset</span>
-              <span class="ledger-entry ledger-title c4">Amount</span>
-              <span class="ledger-entry ledger-title c5">Cost £</span>
-              <span class="ledger-entry ledger-title c6">Proceeds £</span>
-              <span class="ledger-entry ledger-title c7">P/L £</span>
-              <span class="ledger-entry ledger-title c8">Notes</span>
+              <h5 class="ledger-entry c1">Date Sold</h5>
+              <h5 class="ledger-entry c2">Date Aquired</h5>
+              <h5 class="ledger-entry c3">Asset</h5>
+              <h5 class="ledger-entry c4">Amount</h5>
+              <h5 class="ledger-entry c5">Cost £</h5>
+              <h5 class="ledger-entry c6">Proceeds £</h5>
+              <h5 class="ledger-entry c7">P/L £</h5>
+              <h5 class="ledger-entry c8">Notes</h5>
               <template v-for="t in taxYearData.roundTrips">
                 <div class="trade-row">
                   <span v-bind:class="getTradeClass(t.gainLoss)" class="ledger-entry c1">{{t.dateSold}}</span>
@@ -235,20 +336,22 @@
           <template v-for="inst in holdings">
             <div class="holding">
               <div class="holding-title"><strong>{{inst.name}} ({{inst.ticker}})</strong></div>
-              <p>All Time - Holdings: {{inst.holdings.toFixed(2)}}, Disposals:{{inst.disposalCount}}, P/L:
-                £{{inst.realisedPl.toFixed(2)}}</p>
-              <p>Tax Year - Disposals:{{inst.tyData.disposalCount}}, Gain:{{inst.tyData.realisedProfit.toFixed(2)}},
-                Loss:{{inst.tyData.realisedLoss.toFixed(2)}}, P/L:{{(inst.tyData.realisedProfit -
-                inst.tyData.realisedLoss).toFixed(2)}}</p>
+              <p>All Time - Holdings: {{inst.holdings.toFixed(2)}},
+                Disposals: £{{inst.disposalCount}},
+                P/L: £{{inst.realisedPl.toFixed(2)}}</p>
+              <p>Tax Year - Disposals:{{inst.tyData.disposalCount}},
+                Gain: £{{inst.tyData.realisedProfit.toFixed(2)}},
+                Loss: £{{inst.tyData.realisedLoss.toFixed(2)}},
+                P/L: £{{(inst.tyData.realisedProfit - inst.tyData.realisedLoss).toFixed(2)}}</p>
               <h4>Trades:</h4>
               <div class="disposal-container">
                 <!-- Number of Trades: {{inst.trades.length}} -->
-                <span class="ledger-entry ledger-title c1">ID</span>
-                <span class="ledger-entry ledger-title c2">Date</span>
-                <span class="ledger-entry ledger-title c3">Type</span>
-                <span class="ledger-entry ledger-title c4"># Shares</span>
-                <span class="ledger-entry ledger-title c5">Price GBP</span>
-                <span class="ledger-entry ledger-title c6">Total GBP</span>
+                <h5 class="ledger-entry c1">ID</h5>
+                <h5 class="ledger-entry c2">Date</h5>
+                <h5 class="ledger-entry c3">Type</h5>
+                <h5 class="ledger-entry c4"># Shares</h5>
+                <h5 class="ledger-entry c5">Price GBP</h5>
+                <h5 class="ledger-entry c6">Total GBP</h5>
                 <template v-for="t,key in inst.trades">
                   <!-- {{JSON.stringify(t)}}€€ -->
                   <div v-bind:class="getTradeClass(t.rawType)" class="trade-row">
@@ -266,15 +369,15 @@
                 <!-- Ledger Length: {{inst.ledger.length}} -->
                 <!-- titles -->
                 <!-- <div class="trade-row"> -->
-                <span class="ledger-entry ledger-title ledger-uid">ID</span>
-                <span class="ledger-entry ledger-title ledger-date">Date</span>
-                <span class="ledger-entry ledger-title ledger-change">Change</span>
-                <span class="ledger-entry ledger-title ledger-price">Price £</span>
-                <span class="ledger-entry ledger-title ledger-gain">Gain £</span>
-                <span class="ledger-entry ledger-title ledger-loss">Loss £</span>
-                <span class="ledger-entry ledger-title ledger-s104t">S104 Holdings</span>
-                <span class="ledger-entry ledger-title ledger-s104p">S104 Price</span>
-                <span class="ledger-entry ledger-title ledger-comment">Comment</span>
+                <h5 class="ledger-entry ledger-uid">ID</h5>
+                <h5 class="ledger-entry ledger-date">Date</h5>
+                <h5 class="ledger-entry ledger-change">Change</h5>
+                <h5 class="ledger-entry ledger-price">Price £</h5>
+                <h5 class="ledger-entry ledger-gain">Gain £</h5>
+                <h5 class="ledger-entry ledger-loss">Loss £</h5>
+                <h5 class="ledger-entry ledger-s104t">S104 Holdings</h5>
+                <h5 class="ledger-entry ledger-s104p">S104 Price</h5>
+                <h5 class="ledger-entry ledger-comment">Comment</h5>
                 <!-- </div> -->
                 <template v-for="d in inst.ledger">
                   <!-- {{JSON.stringify(d)}} -->

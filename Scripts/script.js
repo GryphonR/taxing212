@@ -40,6 +40,12 @@ const app = new Vue({
     withdrawals: [],
     dividends: [],
     dividendsTotal: 0,
+    dividendDetails: {
+      uk: 0,
+      nonUk: 0,
+      taxPaid: 0
+    },
+    divUkOthersList: {},
     freeShares: [],
     holdings: {},
     rtHolder: ""
@@ -81,6 +87,30 @@ const app = new Vue({
       a = String(a).slice(-2);
       b = String(b).slice(-2);
       return (`${a}-${b}FY`);
+    },
+    divTyUkC: function() { // Sum of uk company dividends in tax year
+      let sum = 0;
+      for (i in this.dividends) {
+        let d = this.dividends[i];
+        if (d.inTaxYear && d.ukCompany && d.isUk) {
+          sum += d.value;
+        }
+      }
+
+      // Piggybacking here as this is computed each time a checkbox is changed
+      this.divUkOthersUpdate();
+      return (sum.toFixed(2));
+    },
+    divTyUkO: function() { // Sum of UK non company dividends in tax year
+      let sum = 0;
+      for (i in this.dividends) {
+        let d = this.dividends[i];
+        if (d.inTaxYear && !d.ukCompany && d.isUk) {
+          sum += d.value;
+        }
+      }
+      return (sum.toFixed(2));
+
     }
   },
   methods: {
@@ -105,6 +135,11 @@ const app = new Vue({
       this.withdrawals = [];
       this.dividends = [];
       this.dividendsTotal = 0;
+      dividendDetails = {
+        uk: 0,
+        nonUk: 0,
+        taxPaid: 0
+      };
       this.freeShares = [];
       this.holdings = {};
       this.taxYearData = {
@@ -118,6 +153,39 @@ const app = new Vue({
       };
     },
     //Housekeeping Methods:
+    divUkOthersUpdate() {
+      tmp = [];
+      for (i in this.dividends) {
+        let d = this.dividends[i];
+        if (!d.ukCompany) {
+          tmp.push(d.name);
+        }
+      }
+      this.divUkOthersList = tmp;
+      localStorage.setItem("UKOthers", JSON.stringify(tmp));
+
+      //Now propogate change to any other dividends from same Company
+      // TODO. Breaks because different divs from same company show different status
+      // for (i in this.dividends) {
+      //   let d = this.dividends[i];
+      //   if (d.isUk) {
+      //     d.ukCompany = !this.divUkOthersCheck(d.name);
+      //   }
+      // }
+
+    },
+    divUkOthersCheck(name) {
+      console.log(`Finding Div ${name} in ${JSON.stringify(this.divUkOthersList)}`);
+      let found = 0;
+      for (i in this.divUkOthersList) {
+        let e = this.divUkOthersList[i];
+        if (e === name) {
+          found = 1; // Dividend is already in list
+          console.log(`found!`);
+        }
+      }
+      return found;
+    },
     getTradeClass(type) {
       if (isNaN(type)) {
         if (type === "Buy") {
@@ -237,7 +305,7 @@ const app = new Vue({
       for (i in this.taxYearData.roundTrips) {
         trip = this.taxYearData.roundTrips[i];
         acquisitionCost += Number(trip.cost);
-        console.log(`Acquistion Cost: ${acquisitionCost}, ${trip.cost}`);
+        // console.log(`Acquisition Cost: ${acquisitionCost}, ${trip.cost}`);
         proceeds += Number(trip.proceeds);
       }
 
@@ -399,11 +467,36 @@ const app = new Vue({
         timestamp: this.getTimestamp(trade[1]),
         dateString: trade[1],
         value: Number(trade[10]),
-        inTaxYear: this.inTaxYear(this.getTimestamp(trade[1])),
+        isUk: trade[7] === "GBX" ? 1 : 0,
+        taxPaidGBP: 0,
+        ukCompany: 1, // As against fund. This has to be manual user input... maybe checkboxes?
+        inTaxYear: this.inTaxYear(this.getTimestamp(trade[1]))
       };
+
+      //Get UK Others list from Local Storage if it exists
+      if (localStorage.getItem("UKOthers") != null) {
+        this.divUkOthersList = JSON.parse(localStorage.getItem('UKOthers'));
+      }
+
+      // if not UK dividend, calculate any tax paid in GBP. Annoyingly T212 don't provide
+      // exchange rate data, but can be calculated from dividend price per share and GBP paid.
+      if (!temp.isUk) {
+        if (temp.inTaxYear) {
+          this.dividendDetails.nonUk += temp.value;
+          if (!isNaN(trade[11])) { // Tax has been paid
+            //Calculate exchange rate: return per share * shares - tax paid / GBP div paid.
+            let exRate = ((Number(trade[5]) * Number(trade[6])) - Number(trade[11])) / Number(trade[10]);
+            // console.log(`Exchange Rate: ${exRate}`);
+            temp.taxPaidGBP = Number(trade[11]) * exRate;
+            this.dividendDetails.taxPaid += temp.taxPaidGBP;
+          }
+        }
+      } else { //uk
+        temp.ukCompany = !this.divUkOthersCheck(temp.name);
+      }
+
       //If in tax year, add to tax year data
-      if (temp.timestamp >= this.taxYear.start && temp.timestamp <= this.taxYear.end) {
-        temp.inTaxYear = 1;
+      if (temp.inTaxYear) {
         this.taxYearData.dividends += temp.value;
       }
       if (temp.timestamp > this.taxYear.p30) { // A check that the data goes past the 30 days required to identify bnb trades
@@ -495,6 +588,11 @@ const app = new Vue({
           return a.timestamp - b.timestamp;
         });
       }
+
+      //Sort dividends
+      this.dividends.sort(function(a, b) {
+        return a.timestamp - b.timestamp;
+      });
 
       // lets sort holdings by first trade date too:
       this.holdings = Object.fromEntries(Object.entries(this.holdings).sort(([, a], [, b]) => a.trades[0].timestamp - b.trades[0].timestamp));
