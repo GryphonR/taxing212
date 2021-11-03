@@ -175,13 +175,11 @@ const app = new Vue({
 
     },
     divUkOthersCheck(name) {
-      console.log(`Finding Div ${name} in ${JSON.stringify(this.divUkOthersList)}`);
       let found = 0;
       for (i in this.divUkOthersList) {
         let e = this.divUkOthersList[i];
         if (e === name) {
           found = 1; // Dividend is already in list
-          console.log(`found!`);
         }
       }
       return found;
@@ -285,6 +283,7 @@ const app = new Vue({
             trip.dateSold = this.getDmyString(entry.timestamp);
             trip.timestamp = entry.timestamp;
             trip.asset = holding.ticker;
+            trip.name = holding.name;
             trip.amount = Math.abs(entry.change);
             trip.proceeds = (entry.price * Math.abs(entry.change)).toFixed(2);
             trip.gainLoss = (entry.gain - entry.loss).toFixed(2);
@@ -468,7 +467,10 @@ const app = new Vue({
         dateString: trade[1],
         value: Number(trade[10]),
         isUk: trade[7] === "GBX" ? 1 : 0,
+        taxCurrency: trade[7],
+        taxPaid: trade[11],
         taxPaidGBP: 0,
+        exchangeRate: 0,
         ukCompany: 1, // As against fund. This has to be manual user input... maybe checkboxes?
         inTaxYear: this.inTaxYear(this.getTimestamp(trade[1]))
       };
@@ -481,15 +483,15 @@ const app = new Vue({
       // if not UK dividend, calculate any tax paid in GBP. Annoyingly T212 don't provide
       // exchange rate data, but can be calculated from dividend price per share and GBP paid.
       if (!temp.isUk) {
-        if (temp.inTaxYear) {
-          this.dividendDetails.nonUk += temp.value;
-          if (!isNaN(trade[11])) { // Tax has been paid
-            //Calculate exchange rate: return per share * shares - tax paid / GBP div paid.
-            let exRate = ((Number(trade[5]) * Number(trade[6])) - Number(trade[11])) / Number(trade[10]);
-            // console.log(`Exchange Rate: ${exRate}`);
-            temp.taxPaidGBP = Number(trade[11]) * exRate;
-            this.dividendDetails.taxPaid += temp.taxPaidGBP;
-          }
+        if (temp.inTaxYear) this.dividendDetails.nonUk += temp.value;
+        if (Number(trade[11]) > 0) { // Tax has been paid
+          //Calculate exchange rate: return per share * shares - tax paid / GBP div paid.
+          let exRate = ((Number(trade[5]) * Number(trade[6])) - Number(trade[11])) / Number(trade[10]);
+          console.log(`Exchange Rate: ${exRate} for ${temp.name}`);
+          console.log(`rps: ${trade[5]}, numShare: ${trade[6]}, tax: ${trade[11]}, paid: ${trade[10]}`);
+          temp.taxPaidGBP = Number(trade[11]) * exRate;
+          temp.exchangeRate = exRate;
+          if (temp.inTaxYear) this.dividendDetails.taxPaid += temp.taxPaidGBP;
         }
       } else { //uk
         temp.ukCompany = !this.divUkOthersCheck(temp.name);
@@ -538,7 +540,8 @@ const app = new Vue({
         t212ID: trade[18],
         frenchTransactionTax: Number(trade[19]),
         wasFree: false,
-        inLedger: 0
+        inLedger: 0,
+
       };
 
       /// HOLDINGS
@@ -564,7 +567,8 @@ const app = new Vue({
             disposalCount: 0,
             realisedLoss: 0,
             realisedProfit: 0
-          }
+          },
+          uiExpand: 1
         };
       }
 
