@@ -95,9 +95,9 @@ h5{
 }
 
 .instruction{
-  display: inline-block;  
+  /* display: inline-block;   */
   margin:5px auto 40px;
-  width: 80vw;
+  width: 42vw;
   max-width: 900px;
   min-width: 500px;
   background-color:#fbfbfb;
