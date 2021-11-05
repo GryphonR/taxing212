@@ -50,9 +50,9 @@ const app = new Vue({
     holdings: {},
     rtHolder: ""
   },
-  mounted: function() {
+  mounted: function () {
     //Check Local Storage for data:
-    this.$nextTick(function() {
+    this.$nextTick(function () {
       if (localStorage.getItem("rawData") != null) {
         let tmpFiles = JSON.parse(localStorage.getItem('rawData'));
         for (i in tmpFiles) {
@@ -62,7 +62,7 @@ const app = new Vue({
     });
   },
   computed: {
-    fyText: function() {
+    fyText: function () {
       let a = Number(this.taxYear.target);
       let b = Number(this.taxYear.target) + 1;
 
@@ -88,7 +88,7 @@ const app = new Vue({
       b = String(b).slice(-2);
       return (`${a}-${b}FY`);
     },
-    divTyUkC: function() { // Sum of uk company dividends in tax year
+    divTyUkC: function () { // Sum of uk company dividends in tax year
       let sum = 0;
       for (i in this.dividends) {
         let d = this.dividends[i];
@@ -101,7 +101,7 @@ const app = new Vue({
       this.divUkOthersUpdate();
       return (sum.toFixed(2));
     },
-    divTyUkO: function() { // Sum of UK non company dividends in tax year
+    divTyUkO: function () { // Sum of UK non company dividends in tax year
       let sum = 0;
       for (i in this.dividends) {
         let d = this.dividends[i];
@@ -121,7 +121,9 @@ const app = new Vue({
     },
     clearFiles() {
       this.fileList = [];
-      localStorage.clear();
+      if (localStorage.getItem("rawData") != null) {
+        localStorage.removeItem("rawData");
+      }
     },
     resetCalculations() {
       this.taxYear.p30Seen = 0;
@@ -153,6 +155,11 @@ const app = new Vue({
       };
     },
     //Housekeeping Methods:
+    uiAllHoldings(state){
+      for(i in this.holdings){
+        this.holdings[i].uiExpand = state;
+      }
+    },
     divUkOthersUpdate() {
       tmp = [];
       for (i in this.dividends) {
@@ -294,7 +301,7 @@ const app = new Vue({
         }
       }
       // Now sort trips by date
-      this.taxYearData.roundTrips.sort(function(a, b) {
+      this.taxYearData.roundTrips.sort(function (a, b) {
         return a.timestamp - b.timestamp;
       });
 
@@ -375,7 +382,7 @@ const app = new Vue({
         t.fileList.push(file.name);
         // console.log(file);
         var trades = Papa.parse(localFile, {
-          complete: function(results) {
+          complete: function (results) {
             // Remove titles
             var headers = results.data.shift();
 
@@ -560,6 +567,7 @@ const app = new Vue({
           realisedLoss: 0,
           realisedPl: 0,
           disposalCount: 0,
+          tradeCount: 0,
           trades: [],
           ledger: [],
           disposals: [],
@@ -568,7 +576,7 @@ const app = new Vue({
             realisedLoss: 0,
             realisedProfit: 0
           },
-          uiExpand: 1
+          uiExpand: 0
         };
       }
 
@@ -577,9 +585,11 @@ const app = new Vue({
       if (temp.rawType == "Buy") {
         //Calculate average share price
         if (!isNaN(temp.number)) this.holdings[ticker].holdings += temp.number;
+        this.holdings[ticker].tradeCount++;
       } else {
         if (!isNaN(temp.number)) this.holdings[ticker].holdings -= temp.number;
         this.holdings[ticker].disposalCount++;
+        this.holdings[ticker].tradeCount++;
       }
 
     },
@@ -588,13 +598,13 @@ const app = new Vue({
       // following calculations rely on them being in order
       for (i in this.holdings) {
         let holding = this.holdings[i];
-        holding.trades.sort(function(a, b) {
+        holding.trades.sort(function (a, b) {
           return a.timestamp - b.timestamp;
         });
       }
 
       //Sort dividends
-      this.dividends.sort(function(a, b) {
+      this.dividends.sort(function (a, b) {
         return a.timestamp - b.timestamp;
       });
 
