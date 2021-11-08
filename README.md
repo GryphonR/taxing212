@@ -7,12 +7,12 @@ This started because Trading 212 don't give account statements that calculate ga
 
 If you find any issues or mistakes in the calculations please raise a github issue!
 
-Aim: a simple to use website that converts the CSV trade history that Trading212 suplies into a useful tax year (and all time) overiew, providing all the information required for a Self Assessment form (However I'll emphasize that the results given from this site are assumed to be incorrect! - and certinaly are at the moment)
+Aim: a simple to use website that converts the CSV trade history that Trading212 suplies into a useful tax year (and all time) overiew, providing all the information required for a Self Assessment form. These results may only be used for tax purposes after they has been checked for accuracy and completeness by yourself or your tax advisor.
 
 Privacy - all calculation is done locally in the browser, no information leaves your computer. There are no ads or analytics.
 
 
-And a reminder:
+
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
