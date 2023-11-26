@@ -155,8 +155,8 @@ const app = new Vue({
       };
     },
     //Housekeeping Methods:
-    uiAllHoldings(state){
-      for(i in this.holdings){
+    uiAllHoldings(state) {
+      for (i in this.holdings) {
         this.holdings[i].uiExpand = state;
       }
     },
@@ -235,6 +235,7 @@ const app = new Vue({
         return 0;
       }
     },
+    //Date must be formatted as YYYY-MMM-DD optionally YYY-MM-DDTHH:MM:SS
     getTimestamp(date) { // Takes in a datestring returns UTC Seconds
       // console.log(date);
       let timestamp = Date.parse(date);
@@ -491,12 +492,12 @@ const app = new Vue({
       // exchange rate data, but can be calculated from dividend price per share and GBP paid.
       if (!temp.isUk) {
         if (temp.inTaxYear) this.dividendDetails.nonUk += temp.value;
-        if (Number(trade[11]) > 0) { // Tax has been paid
+        if (this.getNumber(trade[11]) > 0) { // Tax has been paid
           //Calculate exchange rate: return per share * shares - tax paid / GBP div paid.
-          let exRate = ((Number(trade[5]) * Number(trade[6])) - Number(trade[11])) / Number(trade[10]);
+          let exRate = ((this.getNumber(trade[5]) * this.getNumber(trade[6])) - this.getNumber(trade[11])) / this.getNumber(trade[10]);
           console.log(`Exchange Rate: ${exRate} for ${temp.name}`);
           console.log(`rps: ${trade[5]}, numShare: ${trade[6]}, tax: ${trade[11]}, paid: ${trade[10]}`);
-          temp.taxPaidGBP = Number(trade[11]) * exRate;
+          temp.taxPaidGBP = this.getNumber(trade[11]) * exRate;
           temp.exchangeRate = exRate;
           if (temp.inTaxYear) this.dividendDetails.taxPaid += temp.taxPaidGBP;
         }
@@ -520,7 +521,8 @@ const app = new Vue({
       name = trade[4];
       isin = trade[2];
 
-      if (trade[0] == "Market buy" || trade[0] == "Limit buy") {
+      if (trade[0].toLowerCase().includes("buy")) {
+        // if (trade[0] == "Market buy" || trade[0] == "Limit buy") {
         rawTradeType = "Buy";
       }
 
@@ -530,22 +532,22 @@ const app = new Vue({
         dateString: trade[1],
         orderType: trade[0],
         rawType: rawTradeType,
-        value: Number(trade[10]),
+        value: this.getNumber(trade[10]),
         // isin: trade[2],
-        number: Number(trade[5]),
-        price: Number(trade[6]),
-        priceGBP: Number(trade[6]) / Number(trade[8]), // Price / exchange rate
-        exchangeRate: Number(trade[8]),
-        result: Number(trade[9]),
-        total: Number(trade[10]),
-        withholdingTax: Number(trade[11]),
+        number: this.getNumber(trade[5]),
+        price: this.getNumber(trade[6]),
+        priceGBP: this.getNumber(trade[6]) / this.getNumber(trade[8]), // Price / exchange rate
+        exchangeRate: this.getNumber(trade[8]),
+        result: this.getNumber(trade[9]),
+        total: this.getNumber(trade[10]),
+        withholdingTax: this.getNumber(trade[11]),
         wthTaxCurrency: trade[12],
-        stampDuty: Number(trade[14]),
-        transactionFee: Number(trade[15]),
-        finraFee: Number(trade[16]),
+        stampDuty: this.getNumber(trade[14]),
+        transactionFee: this.getNumber(trade[15]),
+        finraFee: this.getNumber(trade[16]),
         notes: trade[17],
         t212ID: trade[18],
-        frenchTransactionTax: Number(trade[19]),
+        frenchTransactionTax: this.getNumber(trade[19]),
         wasFree: false,
         inLedger: 0,
 
@@ -592,6 +594,17 @@ const app = new Vue({
         this.holdings[ticker].tradeCount++;
       }
 
+    },
+    // Added function to clean commas out of number before parsing. Decimal points MUST be . not ,
+    getNumber(data) {
+      console.log(`Incoming data: ${data}`);
+      if (data != "" && data != null) {
+        let cleaned = data.replace(/,/g, '');
+        console.log(`Cleaned Data: ${cleaned}`);
+        return (Number(cleaned));
+      } else {
+        return Number(data);
+      }
     },
     sortTrades() {
       // if csv files aren't in chronological order, trades won't be, but
