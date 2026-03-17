@@ -238,8 +238,12 @@ const app = new Vue({
       if (!event.dataTransfer || !event.dataTransfer.files || !event.dataTransfer.files.length) {
         return;
       }
-      const droppedFile = event.dataTransfer.files[0];
-      this.addFileFromBlob(droppedFile);
+      
+      // Loop through all dropped files
+      const files = event.dataTransfer.files;
+      for (let i = 0; i < files.length; i++) {
+        this.addFileFromBlob(files[i]);
+      }
     },
     addFileFromBlob(localFile) {
       var t = this;
@@ -786,12 +790,17 @@ const app = new Vue({
     },
     // Calculation Methods:
     addFile() {
-      var localFile = this.$refs.csvFile.files[0];
-      if (!localFile) {
+      // Get the full list of files instead of just [0]
+      var files = this.$refs.csvFile.files;
+      if (!files || files.length === 0) {
         this.setUploadStatus("error", "No file selected. Please choose a CSV export file.");
         return;
       }
-      this.addFileFromBlob(localFile);
+      
+      // Loop through and add each selected file
+      for (let i = 0; i < files.length; i++) {
+        this.addFileFromBlob(files[i]);
+      }
     },
     calculate() {
       t = this
