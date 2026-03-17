@@ -31,7 +31,7 @@
         <div class="stepper-item">3. Calculate</div>
       </div>
 
-      <div class="instruction">
+<div class="instruction">
         <h3 class="summary-box-title">Step 1</h3>
         <p>Load your T212 trade history CSV files. Full history is required to
           calculate Section 104 Holdings prices. If history is spread across multiple files please ensure there are
@@ -46,7 +46,7 @@
           </div>
         </div>
         <div class="centre">
-          <input id="fileButton" style="display:none" type="file" ref="csvFile" accept=".csv,text/csv" @change="addFile"></input><br>
+          <input id="fileButton" style="display:none" type="file" ref="csvFile" accept=".csv,text/csv" multiple @change="addFile"></input><br>
           <div class="drop-zone" :class="{ 'drop-zone-active': isDraggingFile }" @click="openFilePicker"
             @dragover.prevent="onDragOver" @dragleave.prevent="onDragLeave" @drop.prevent="onFileDrop">
             <p><strong>Drop CSV files here</strong> or click to browse.</p>
@@ -58,10 +58,10 @@
         </div>
 
         <div class="button" v-on:click="clearFiles()">Clear Files</div>
+        
+        <p class="centre" style="margin-top: 15px;">Note: If you have made changes to a csv file it must be removed and re-added.</p>
       </div>
       
-      <p class="centre">Note: If you have made changes to a csv file it must be removed and re-added.</p>
-
       <div class="instruction">
         <h3 class="summary-box-title">Step 2</h3>
         <p>Select Tax Year to report on</p>
