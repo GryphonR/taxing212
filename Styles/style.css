@@ -122,6 +122,40 @@ h5{
   overflow-x: scroll;
 }
 
+
+.file-list {
+  margin-top: 10px;
+}
+
+.file-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--slate-300);
+}
+
+.file-list-item:last-child {
+  border-bottom: none;
+}
+
+.file-remove-button {
+  border: 1px solid var(--slate-300);
+  background: #fff;
+  color: var(--danger);
+  border-radius: 999px;
+  width: 24px;
+  height: 24px;
+  line-height: 20px;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.file-remove-button:hover {
+  background: var(--danger-bg);
+}
 .round-trip-master-container{
   background-color: #f1f1f1;
   border-radius: 5px;
@@ -661,6 +695,10 @@ h5{
 
 .stepper-item.active {
   background: var(--shade1);
+}
+
+.workflow-shell .g2 {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .results-tabs {
