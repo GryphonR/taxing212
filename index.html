@@ -34,7 +34,7 @@
 
       <div class="g2">
         <div class="c1">
-          <div style="margin:0 40px">
+          <div>
             <div class="instruction">
               <h3 class="summary-box-title">Step 1</h3>
               <p>Load your T212 trade history CSV files. Full history is required to
@@ -48,7 +48,7 @@
                 </template>
               </div>
               <div class="centre">
-                <input id="fileButton" style="display:none" type="file" ref="csvFile" @change="addFile"></input><br>
+                <input id="fileButton" style="display:none" type="file" ref="csvFile" accept=".csv,text/csv" @change="addFile"></input><br>
                 <div class="drop-zone" :class="{ 'drop-zone-active': isDraggingFile }" @click="openFilePicker"
                   @dragover.prevent="onDragOver" @dragleave.prevent="onDragLeave" @drop.prevent="onFileDrop">
                   <p><strong>Drop CSV files here</strong> or click to browse.</p>
