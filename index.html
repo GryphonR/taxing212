@@ -43,9 +43,12 @@
                 overlaps.</p>
               <div v-if="fileList.length > 0" class="files">
                 <strong>Files Loaded:</strong>
-                <template v-for="fileName in fileList">
-                  <p>{{fileName}}</p>
-                </template>
+                <div class="file-list">
+                  <div class="file-list-item" v-for="fileName in fileList" :key="fileName">
+                    <span>{{fileName}}</span>
+                    <button class="file-remove-button" type="button" title="Remove this file" @click="removeFile(fileName)">×</button>
+                  </div>
+                </div>
               </div>
               <div class="centre">
                 <input id="fileButton" style="display:none" type="file" ref="csvFile" accept=".csv,text/csv" @change="addFile"></input><br>

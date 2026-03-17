@@ -373,6 +373,26 @@ const app = new Vue({
       this.calculated = 0;
       this.resetCalculations();
     },
+    removeFile(fileName) {
+      if (!fileName) {
+        return;
+      }
+
+      this.fileList = this.fileList.filter(name => name !== fileName);
+      let data = [];
+      if (localStorage.getItem("rawData") != null) {
+        data = JSON.parse(localStorage.getItem('rawData'));
+      }
+
+      data = data.filter(file => file.name !== fileName);
+      if (data.length) {
+        localStorage.setItem("rawData", JSON.stringify(data));
+      } else {
+        localStorage.removeItem("rawData");
+      }
+
+      this.setUploadStatus("success", `${fileName} removed.`);
+    },
     clearFiles() {
       this.fileList = [];
       this.setUploadStatus("", "");
