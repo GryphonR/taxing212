@@ -701,28 +701,6 @@ h5{
   grid-template-columns: minmax(0, 1fr);
 }
 
-.results-tabs {
-  width: 95%;
-  max-width: 1200px;
-  margin: 20px auto;
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.tab-button {
-  border: 1px solid var(--slate-300);
-  border-radius: 8px;
-  padding: 8px 14px;
-  cursor: pointer;
-  font-weight: 700;
-  background: #fff;
-}
-
-.tab-button.active {
-  background: var(--shade2);
-}
-
 .holding-warning {
   margin-left: 8px;
 }
@@ -794,4 +772,4 @@ h5{
   .stepper-arrow {
     display: none;
   }
-}
+    }
