@@ -1,3 +1,8 @@
+/* ===== VUE MOUNTING FIX ===== */
+[v-cloak] { 
+  display: none; 
+}
+
 /* ===== COLOURS ===== */
 :root {
   --background: #95D5B2;
@@ -100,7 +105,7 @@ h5 {
   border-radius: 10px;
 }
 
-/* ===== MISSING UTILITY CLASSES (ADDED) ===== */
+/* ===== LAYOUT & UTILITY CLASSES ===== */
 .centre {
   text-align: center;
   margin-left: auto;
@@ -121,7 +126,7 @@ h5 {
   gap: 15px;
 }
 
-/* ===== WORKFLOW & STEPPER (ADDED) ===== */
+/* ===== WORKFLOW & STEPPER ===== */
 .workflow-shell {
   max-width: 800px;
   margin: 0 auto;
@@ -186,6 +191,21 @@ h5 {
   font-size: 1.1em;
   border-bottom: 2px solid #000;
   margin-bottom: 10px;
+}
+
+.holding-expand-button {
+  text-align: center;
+  padding: 10px;
+  margin-top: 15px;
+  background-color: var(--shade2);
+  color: var(--shade8);
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.holding-expand-button:hover {
+  background-color: var(--shade3);
 }
 
 /* ===== SUMMARY ===== */
