@@ -103,6 +103,8 @@ h5 {
   background: #fbfbfb;
   padding: 10px 20px 20px;
   border-radius: 10px;
+  margin-bottom: 25px; /* Adds space between the white boxes */
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05); /* Optional: visually separates them from the background */
 }
 
 /* ===== LAYOUT & UTILITY CLASSES ===== */
