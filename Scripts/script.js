@@ -584,6 +584,11 @@
         },
         recalculateTaxYearData() {
           this.setTaxYearBounds(this.taxYear.target);
+          
+          // Reset p30Seen flag and remove old p30 warning for each tax year selection
+          this.taxYear.p30Seen = 0;
+          this.errorList = this.errorList.filter(error => !error.msg.includes("No data seen past the end of the tax year +30 days"));
+          
           this.taxYearData = {
             realisedProfit: 0,
             realisedLoss: 0,
@@ -606,6 +611,11 @@
               let entry = holding.ledger[i];
               entry.inTaxYear = this.inTaxYear(entry.timestamp);
 
+              // Check for p30 data during recalculation
+              if (entry.timestamp > this.taxYear.p30) {
+                this.taxYear.p30Seen = 1;
+              }
+
               if (entry.inTaxYear) {
                 holding.tyData.realisedProfit += entry.gain;
                 holding.tyData.realisedLoss += entry.loss;
@@ -623,6 +633,12 @@
           for (let i = 0; i < this.dividends.length; i++) {
             let div = this.dividends[i];
             div.inTaxYear = this.inTaxYear(div.timestamp);
+            
+            // Check for p30 data during recalculation
+            if (div.timestamp > this.taxYear.p30) {
+              this.taxYear.p30Seen = 1;
+            }
+            
             if (div.inTaxYear) {
               this.taxYearData.dividends += div.value;
             }
@@ -635,6 +651,15 @@
               this.taxYearData.proceeds += Number(trip.proceeds);
               this.taxYearData.costs += Number(trip.cost);
             }
+          }
+
+          // Only add warning if no p30 data was found
+          if (!this.taxYear.p30Seen) {
+            console.log(`Caution - No data seen past the end of the tax year +30 days. This period is required for the 30 day BnB calculations if applicable`);
+            this.errorList.push({
+              msg: `Caution - No data seen past the end of the tax year +30 days. This period is required for the 30 day BnB calculations if applicable`,
+              linkedUid: ""
+            });
           }
         },
         calculateUnrealisedGain(holding) {
@@ -1128,7 +1153,7 @@
           if (!temp.isUk) {
             if (temp.inTaxYear) this.dividendDetails.nonUk += temp.value;
             if (this.getNumber(this.getTradeValue(trade, "withholdingTax", 11)) > 0) {
-              let exRate = ((this.getNumber(this.getTradeValue(trade, "numberOfShares", 5)) * this.getNumber(this.getTradeValue(trade, "pricePerShare", 6))) - this.getNumber(this.getTradeValue(trade, "withholdingTax", 11))) / this.getNumber(this.getTradeValue(trade, "totalGbp", 10));
+              let exRate = ((this.getNumber(this.getTradeValue(trade, "numberOfShares", 5)) * this.getNumber(this.getTradeValue(trade, "pricePerShare", 6))) - this.getNumber(this.getTradeValue(trade, "withholdingTax", 11))) / this.getNumber(this.getTradeValue(trade, "withholdingTax", 11));
               temp.taxPaidGBP = this.getNumber(this.getTradeValue(trade, "withholdingTax", 11)) * exRate;
               temp.exchangeRate = exRate;
               if (temp.inTaxYear) this.dividendDetails.taxPaid += temp.taxPaidGBP;
