@@ -1,0 +1,4 @@
+Action,Time,ISIN,Ticker,Name,Notes,ID,No. of shares,Price / share,Currency (Price / share),Exchange rate,Result,Currency (Result),Total,Currency (Total),Withholding tax,Currency (Withholding tax),Stamp duty reserve tax,Currency (Stamp duty reserve tax)
+Market sell,2024-03-01 10:00:00,GB0000000001,BNB,Bed And Breakfast PLC,,SEL001,10.0000000000,20.0000000000,GBP,1.00000000,0.00,GBP,200.00,GBP,0.00,GBP,0.00,GBP
+Market buy,2024-03-15 10:00:00,GB0000000001,BNB,Bed And Breakfast PLC,,BUY001,10.0000000000,10.0000000000,GBP,1.00000000,0.00,GBP,100.00,GBP,0.00,GBP,0.00,GBP
+Market buy,2024-06-10 10:00:00,GB0000000002,P30,P30 Anchor,,P30001,1.0000000000,1.0000000000,GBP,1.00000000,0.00,GBP,1.00,GBP,0.00,GBP,0.00,GBP

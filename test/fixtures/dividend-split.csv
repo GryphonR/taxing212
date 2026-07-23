@@ -1,0 +1,4 @@
+Action,Time,ISIN,Ticker,Name,Notes,ID,No. of shares,Price / share,Currency (Price / share),Exchange rate,Result,Currency (Result),Total,Currency (Total),Withholding tax,Currency (Withholding tax),Stamp duty reserve tax,Currency (Stamp duty reserve tax)
+Dividend (UK),2024-06-01 10:00:00,GB0000000001,UKCO,UK Company PLC,,DIV001,0.0000000000,0.0000000000,GBX,1.00000000,0.00,GBP,25.00,GBP,0.00,GBP,0.00,GBP
+Dividend (Ordinary),2024-06-02 10:00:00,US0000000001,USCO,US Company,,DIV002,0.0000000000,0.0000000000,USD,1.25000000,0.00,USD,40.00,USD,5.00,USD,0.00,USD
+Market buy,2024-06-10 10:00:00,GB0000000002,P30,P30 Anchor,,P30001,1.0000000000,1.0000000000,GBP,1.00000000,0.00,GBP,1.00,GBP,0.00,GBP,0.00,GBP
