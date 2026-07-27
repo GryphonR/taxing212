@@ -1,0 +1,10 @@
+{
+  "name": "taxing212",
+  "private": true,
+  "scripts": {
+    "test": "node tests/taxMath.test.js"
+  },
+  "devDependencies": {
+    "luxon": "^2.0.2"
+  }
+}

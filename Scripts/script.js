@@ -527,36 +527,13 @@
           this.uiRoundTripsExpand = false;
         },
         setTaxYearBounds(targetYear) {
-          let a = Number(targetYear);
-          let b = Number(targetYear) + 1;
-
-          let startDate = new Date();
-          startDate.setTime(0);
-          let endDate = new Date();
-          endDate.setTime(0);
-          startDate.setDate(6);
-          startDate.setMonth(3);
-          startDate.setFullYear(a);
-          endDate.setDate(5);
-          endDate.setMonth(3);
-          endDate.setFullYear(b);
-          let endPlusThirty = new Date(endDate.getTime());
-          endPlusThirty.setDate(endPlusThirty.getDate() + 30);
-
-          this.taxYear.start = startDate.getTime();
-          this.taxYear.end = endDate.getTime();
-          this.taxYear.p30 = endPlusThirty.getTime();
+          const bounds = TaxMath.getTaxYearBounds(targetYear);
+          this.taxYear.start = bounds.start;
+          this.taxYear.end = bounds.end;
+          this.taxYear.p30 = bounds.p30;
         },
         getTaxYearFromTimestamp(timestamp) {
-          let date = new Date(timestamp);
-          let year = date.getUTCFullYear();
-          let month = date.getUTCMonth();
-          let day = date.getUTCDate();
-
-          if (month < 3 || (month === 3 && day < 6)) {
-            return year - 1;
-          }
-          return year;
+          return TaxMath.getTaxYearFromTimestamp(timestamp);
         },
         buildAvailableTaxYears() {
           let taxYears = {};
@@ -643,6 +620,13 @@
               this.taxYearData.dividends += div.value;
             }
           }
+
+          const foreignDividends = TaxMath.recalculateForeignDividendDetails(
+            this.dividends,
+            (timestamp) => this.inTaxYear(timestamp)
+          );
+          this.dividendDetails.nonUk = foreignDividends.nonUk;
+          this.dividendDetails.taxPaid = foreignDividends.taxPaid;
 
           for (let i = 0; i < this.allRoundTrips.length; i++) {
             let trip = this.allRoundTrips[i];
@@ -770,29 +754,12 @@
         getUID() {
           return UID++;
         },
-        sameDay(ref, test) { //returns true if dates are in the same day
-          ref = luxon.DateTime.fromMillis(ref);
-          test = luxon.DateTime.fromMillis(test);
-
-          if (ref.year != test.year) {
-            return false;
-          } else if (ref.month != test.month) {
-            return false
-          } else if (ref.day != test.day) {
-            return false;
-          } else {
-            return true;
-          }
-
+        sameDay(ref, test) {
+          return TaxMath.sameDay(ref, test);
         },
         inTaxYear(timestamp) {
           this.setTaxYearBounds(this.taxYear.target);
-          // tax year check
-          if (timestamp >= this.taxYear.start && timestamp <= this.taxYear.end) {
-            return 1;
-          } else {
-            return 0;
-          }
+          return TaxMath.inTaxYear(timestamp, this.taxYear) ? 1 : 0;
         },
         //Date must be formatted as YYYY-MMM-DD optionally YYY-MM-DDTHH:MM:SS
         getTimestamp(date) { // Takes in a datestring returns UTC Seconds
@@ -1181,27 +1148,49 @@
             rawTradeType = "Buy";
           }
 
+          const numberOfShares = this.getNumber(this.getTradeValue(trade, "numberOfShares", 5));
+          const pricePerShare = this.getNumber(this.getTradeValue(trade, "pricePerShare", 6));
+          const exchangeRate = this.getNumber(this.getTradeValue(trade, "exchangeRate", 8)) || 1;
+          const totalGbp = this.getNumber(this.getTradeValue(trade, "totalGbp", 10));
+          const stampDuty = this.getNumber(this.getTradeValue(trade, "stampDutyReserveTaxGbp", 14));
+          const transactionFee = this.getNumber(this.getTradeValue(trade, "transactionFeeGbp", 15));
+          const finraFee = this.getNumber(this.getTradeValue(trade, "finraFeeGbp", 16));
+          const frenchTransactionTax = this.getNumber(this.getTradeValue(trade, "frenchTransactionTax", 19));
+          const priceGBP = TaxMath.effectivePricePerShare(
+            rawTradeType,
+            numberOfShares,
+            pricePerShare,
+            exchangeRate,
+            totalGbp,
+            {
+              stampDuty: stampDuty,
+              transactionFee: transactionFee,
+              finraFee: finraFee,
+              frenchTransactionTax: frenchTransactionTax
+            }
+          );
+
           let temp = {
             uid: this.getUID(),
             timestamp: this.getTimestamp(this.getTradeValue(trade, "time", 1)),
             dateString: this.getTradeValue(trade, "time", 1),
             orderType: this.getTradeValue(trade, "action", 0),
             rawType: rawTradeType,
-            value: this.getNumber(this.getTradeValue(trade, "totalGbp", 10)),
-            number: this.getNumber(this.getTradeValue(trade, "numberOfShares", 5)),
-            price: this.getNumber(this.getTradeValue(trade, "pricePerShare", 6)),
-            priceGBP: this.safeDiv(this.getNumber(this.getTradeValue(trade, "pricePerShare", 6)), this.getNumber(this.getTradeValue(trade, "exchangeRate", 8)) || 1),
-            exchangeRate: this.getNumber(this.getTradeValue(trade, "exchangeRate", 8)) || 1,
+            value: totalGbp,
+            number: numberOfShares,
+            price: pricePerShare,
+            priceGBP: priceGBP,
+            exchangeRate: exchangeRate,
             result: this.getNumber(this.getTradeValue(trade, "resultGbp", 9)),
-            total: this.getNumber(this.getTradeValue(trade, "totalGbp", 10)),
+            total: totalGbp,
             withholdingTax: this.getNumber(this.getTradeValue(trade, "withholdingTax", 11)),
             wthTaxCurrency: this.getTradeValue(trade, "withholdingTaxCurrency", 12),
-            stampDuty: this.getNumber(this.getTradeValue(trade, "stampDutyReserveTaxGbp", 14)),
-            transactionFee: this.getNumber(this.getTradeValue(trade, "transactionFeeGbp", 15)),
-            finraFee: this.getNumber(this.getTradeValue(trade, "finraFeeGbp", 16)),
+            stampDuty: stampDuty,
+            transactionFee: transactionFee,
+            finraFee: finraFee,
             notes: this.getTradeValue(trade, "notes", 17),
             t212ID: this.getTradeValue(trade, "id", 18),
-            frenchTransactionTax: this.getNumber(this.getTradeValue(trade, "frenchTransactionTax", 19)),
+            frenchTransactionTax: frenchTransactionTax,
             wasFree: false,
             inLedger: 0,
           };
@@ -1315,12 +1304,14 @@
                       holding.ledger[ledgerIndex].tradeIDs.push(compTrade.uid);
                       holding.ledger[ledgerIndex].tradeCount++;
 
-                      let currNP = this.safeMult(holding.ledger[ledgerIndex].change, holding.ledger[ledgerIndex].price); 
                       let newTradeChange = compTrade.rawType == "Buy" ? compTrade.number : -compTrade.number;
-                      let newNP = this.safeMult(Math.abs(newTradeChange), Math.abs(compTrade.priceGBP));
-
-                      holding.ledger[ledgerIndex].change = this.safeAdd(holding.ledger[ledgerIndex].change, newTradeChange); 
-                      holding.ledger[ledgerIndex].priceGBP = this.safeDiv(this.safeAdd(currNP, newNP), Math.abs(holding.ledger[ledgerIndex].change));
+                      holding.ledger[ledgerIndex].change = this.safeAdd(holding.ledger[ledgerIndex].change, newTradeChange);
+                      holding.ledger[ledgerIndex].price = TaxMath.mergeSameDayPrice(
+                        this.safeSub(holding.ledger[ledgerIndex].change, newTradeChange),
+                        holding.ledger[ledgerIndex].price,
+                        newTradeChange,
+                        compTrade.priceGBP
+                      );
 
                       compTrade.inLedger = 1; 
                       if (holding.ledger[ledgerIndex].tradeCount > 2) holding.ledger[ledgerIndex].comment.pop();
@@ -1416,13 +1407,10 @@
               let buy = holding.ledger[i];
 
               if (buy.change > 0 && !buy.counted) { 
-                let thirtyDays = 1000 * 60 * 60 * 24 * 30;
-                let cutOff = buy.timestamp - thirtyDays;
-
                 for (let j in holding.ledger) {
                   let sell = holding.ledger[j];
                   if (sell.change < 0 && !sell.counted) { 
-                    if (sell.timestamp > cutOff && sell.timestamp < buy.timestamp) {
+                    if (TaxMath.isWithinBedAndBreakfastWindow(sell.timestamp, buy.timestamp)) {
                       if (sell.change + buy.change === 0) { 
                         sell.counted = 1;
                         sell.comment.push(`30 day BnB rule, counted against Buy #${buy.uid}`);
