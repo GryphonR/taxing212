@@ -6,8 +6,10 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "build": "vite build",
-    "build:app": "vite build"
+    "dev": "vite",
+    "build": "node scripts/build-app.mjs",
+    "build:app": "node scripts/build-app.mjs",
+    "preview": "npm run build && npx --yes serve -l 8000 ."
   },
   "dependencies": {
     "decimal.js": "^10.4.3",
