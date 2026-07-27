@@ -6,15 +6,17 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "build": "vite build"
-  },
-  "devDependencies": {
-    "vite": "^6.3.5",
-    "vitest": "^3.2.4"
+    "build": "vite build",
+    "build:app": "vite build"
   },
   "dependencies": {
     "decimal.js": "^10.4.3",
     "luxon": "^2.5.2",
-    "papaparse": "^5.5.3"
+    "papaparse": "^5.5.3",
+    "vue": "^2.7.16"
+  },
+  "devDependencies": {
+    "vite": "^6.3.5",
+    "vitest": "^3.2.4"
   }
 }

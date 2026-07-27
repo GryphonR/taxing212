@@ -6,3 +6,4 @@ export { runCalculation, recalculateForTaxYear, resetUidCounter } from './calcul
 export { parseCsvText, normaliseTradeRow, hasRequiredTradeHeaders } from './parse/csv-normaliser.js';
 export { getTaxYearBounds, getTimestamp, inTaxYear } from './tax/dates.js';
 export { REQUIRED_T212_FIELDS } from './config/t212-fields.js';
+export { buildUkOthersList } from './tax/uk-others.js';
