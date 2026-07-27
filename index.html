@@ -18,7 +18,7 @@
         &larr; Back</div>
     </div>
 
-    <div style="height:100px"></div>
+    <div class="page-header-spacer"></div>
 
     <div v-if="!calculated" class="workflow-shell">
       <div class="stepper">
@@ -32,7 +32,7 @@
       <div id="step1" class="instruction">
         <h3 class="summary-box-title">Step 1: Input Data</h3>
         
-        <div class="results-tabs" style="margin-top: 0; margin-bottom: 15px;">
+        <div class="results-tabs results-tabs--tight">
           <div class="tab-button" :class="{active: activeInputTab === 'csv'}" @click="activeInputTab = 'csv'">CSV Upload</div>
           <div class="tab-button" :class="{active: activeInputTab === 'manual'}" @click="activeInputTab = 'manual'">Manual Trades</div>
           <div class="tab-button" :class="{active: activeInputTab === 'corp'}" @click="activeInputTab = 'corp'">Corporate Actions</div>
@@ -52,7 +52,7 @@
             </div>
           </div>
           <div class="centre">
-            <input id="fileButton" style="display:none" type="file" ref="csvFile" accept=".csv,text/csv" multiple @change="addFile" />
+            <input id="fileButton" type="file" ref="csvFile" accept=".csv,text/csv" multiple @change="addFile" />
             <br>
             <div class="drop-zone" :class="{ 'drop-zone-active': isDraggingFile }" @click="openFilePicker"
               @dragover.prevent="onDragOver" @dragleave.prevent="onDragLeave" @drop.prevent="onFileDrop">
@@ -66,12 +66,12 @@
 
           <div class="button" v-on:click="clearFiles()">Clear Files</div>
           
-          <p class="centre" style="margin-top: 15px;">Note: If you have made changes to a csv file it must be removed and re-added.</p>
+          <p class="centre mt-15">Note: If you have made changes to a csv file it must be removed and re-added.</p>
         </div>
 
         <div v-show="activeInputTab === 'manual'">
           <p>Add manual trades here to account for in-specie transfers from other brokers.</p>
-          <div class="dividend-table" style="grid-template-columns: 1.5fr 1fr 1fr 1.5fr 1fr 1fr 80px; align-items: center;">
+          <div class="dividend-table dividend-table--manual">
             <h5 class="ledger-entry">Date/Time</h5>
             <h5 class="ledger-entry">Action</h5>
             <h5 class="ledger-entry">Ticker</h5>
@@ -87,27 +87,27 @@
               <span class="ledger-entry">{{mt.name}}</span>
               <span class="ledger-entry">{{mt.shares}}</span>
               <span class="ledger-entry">£{{mt.price}}</span>
-              <span class="ledger-entry" style="justify-content: center;"><button class="file-remove-button" @click.prevent="removeManualTrade(mt.uid)">×</button></span>
+              <span class="ledger-entry ledger-entry--action"><button class="file-remove-button" @click.prevent="removeManualTrade(mt.uid)">×</button></span>
             </template>
 
-            <span class="ledger-entry"><input type="datetime-local" v-model="manualTradeForm.date" style="width: 100%; box-sizing: border-box;"></span>
+            <span class="ledger-entry"><input type="datetime-local" v-model="manualTradeForm.date"></span>
             <span class="ledger-entry">
-              <select v-model="manualTradeForm.action" style="width: 100%; box-sizing: border-box;">
+              <select v-model="manualTradeForm.action">
                 <option>Buy</option>
                 <option>Sell</option>
               </select>
             </span>
-            <span class="ledger-entry"><input type="text" list="portfolio-tickers" placeholder="Ticker" v-model="manualTradeForm.ticker" @change="autoFillManualName" style="width: 100%; box-sizing: border-box;"></span>
-            <span class="ledger-entry"><input type="text" placeholder="Name (opt)" v-model="manualTradeForm.name" style="width: 100%; box-sizing: border-box;"></span>
-            <span class="ledger-entry"><input type="number" step="0.00000001" placeholder="Shares" v-model.number="manualTradeForm.shares" style="width: 100%; box-sizing: border-box;"></span>
-            <span class="ledger-entry"><input type="number" step="0.01" placeholder="Price" v-model.number="manualTradeForm.price" style="width: 100%; box-sizing: border-box;"></span>
-            <span class="ledger-entry" style="justify-content: center;"><div class="button" :class="{ disabled: !isManualTradeValid }" @click="addManualTrade" style="margin:0; padding: 5px 10px;">Add</div></span>
+            <span class="ledger-entry"><input type="text" list="portfolio-tickers" placeholder="Ticker" v-model="manualTradeForm.ticker" @change="autoFillManualName"></span>
+            <span class="ledger-entry"><input type="text" placeholder="Name (opt)" v-model="manualTradeForm.name"></span>
+            <span class="ledger-entry"><input type="number" step="0.00000001" placeholder="Shares" v-model.number="manualTradeForm.shares"></span>
+            <span class="ledger-entry"><input type="number" step="0.01" placeholder="Price" v-model.number="manualTradeForm.price"></span>
+            <span class="ledger-entry ledger-entry--action"><div class="button button--compact" :class="{ disabled: !isManualTradeValid }" @click="addManualTrade">Add</div></span>
           </div>
         </div>
 
         <div v-show="activeInputTab === 'corp'">
           <p>Map corporate actions (like Stock Splits or Mergers). The app will retrospectively apply these to your ledger.</p>
-          <div class="dividend-table" style="grid-template-columns: 1fr 1.5fr 1fr 1.5fr 2fr 80px; align-items: center;">
+          <div class="dividend-table dividend-table--corp">
             <h5 class="ledger-entry">Type</h5>
             <h5 class="ledger-entry">Effective Date</h5>
             <h5 class="ledger-entry">Ticker</h5>
@@ -121,29 +121,29 @@
               <span class="ledger-entry">{{ca.ticker}}</span>
               <span class="ledger-entry">{{ca.type === 'Split' ? ca.ratio + ' for 1' : '-'}}</span>
               <span class="ledger-entry">{{ca.type === 'Rename' ? ca.newTicker + ' (' + ca.newName + ')' : '-'}}</span>
-              <span class="ledger-entry" style="justify-content: center;"><button class="file-remove-button" @click.prevent="removeCorpAction(ca.uid)">×</button></span>
+              <span class="ledger-entry ledger-entry--action"><button class="file-remove-button" @click.prevent="removeCorpAction(ca.uid)">×</button></span>
             </template>
 
             <span class="ledger-entry">
-              <select v-model="corpActionForm.type" style="width: 100%; box-sizing: border-box;">
+              <select v-model="corpActionForm.type">
                 <option>Split</option>
                 <option>Rename</option>
               </select>
             </span>
-            <span class="ledger-entry"><input type="date" v-model="corpActionForm.date" style="width: 100%; box-sizing: border-box;"></span>
-            <span class="ledger-entry"><input type="text" list="portfolio-tickers" placeholder="Ticker" v-model="corpActionForm.ticker" style="width: 100%; box-sizing: border-box;"></span>
+            <span class="ledger-entry"><input type="date" v-model="corpActionForm.date"></span>
+            <span class="ledger-entry"><input type="text" list="portfolio-tickers" placeholder="Ticker" v-model="corpActionForm.ticker"></span>
             <span class="ledger-entry">
-              <input v-if="corpActionForm.type === 'Split'" type="number" step="0.01" placeholder="Ratio (e.g. 4)" v-model.number="corpActionForm.ratio" style="width: 100%; box-sizing: border-box;">
+              <input v-if="corpActionForm.type === 'Split'" type="number" step="0.01" placeholder="Ratio (e.g. 4)" v-model.number="corpActionForm.ratio">
               <span v-else>-</span>
             </span>
             <span class="ledger-entry">
-              <div v-if="corpActionForm.type === 'Rename'" style="display: flex; gap: 5px; width: 100%;">
-                <input type="text" placeholder="New Ticker" v-model="corpActionForm.newTicker" style="width: 50%; box-sizing: border-box;">
-                <input type="text" placeholder="New Name" v-model="corpActionForm.newName" style="width: 50%; box-sizing: border-box;">
+              <div v-if="corpActionForm.type === 'Rename'" class="corp-rename-fields">
+                <input type="text" placeholder="New Ticker" v-model="corpActionForm.newTicker">
+                <input type="text" placeholder="New Name" v-model="corpActionForm.newName">
               </div>
               <span v-else>-</span>
             </span>
-            <span class="ledger-entry" style="justify-content: center;"><div class="button" :class="{ disabled: !isCorpActionValid }" @click="addCorpAction" style="margin:0; padding: 5px 10px;">Add</div></span>
+            <span class="ledger-entry ledger-entry--action"><div class="button button--compact" :class="{ disabled: !isCorpActionValid }" @click="addCorpAction">Add</div></span>
           </div>
         </div>
       </div>
@@ -152,7 +152,7 @@
         <h3 class="summary-box-title">Step 2: Select Tax Year</h3>
         <p>Select the target Tax Year for calculations.</p>
         <div class="centre">
-          <div class="fy-select" style="font-size: 1.2em; font-weight: bold; margin-bottom: 10px;">{{fyText}}</div>
+          <div class="fy-select centre mb-20"><strong>{{fyText}}</strong></div>
           <div class="button" v-on:click="taxYear.target -= 1">-</div>
           <div class="button" v-on:click="taxYear.target += 1">+</div>
         </div>
@@ -210,12 +210,12 @@
 
     <div v-if="calculated">
       <h2 class="centre">Calculations for {{fyText}}</h2>
-      <div class="centre" v-if="sortedTaxYears.length">
+      <div class="centre results-toolbar" v-if="sortedTaxYears.length">
         <label for="resultsTaxYearSelect"><strong>Display results for tax year:</strong></label>
         <select id="resultsTaxYearSelect" class="tax-year-dropdown" v-model.number="taxYear.target">
           <option v-for="year in sortedTaxYears" :value="year">{{String(year).slice(-2)}}-{{String(year + 1).slice(-2)}}FY</option>
         </select>
-        <div class="button" style="margin-left: 15px;" v-on:click="downloadFullSummary()">Download Full Summary</div>
+        <div class="button ml-15" v-on:click="downloadFullSummary()">Download Full Summary</div>
       </div>
 
       <h4 class="centre">These calculations may be used for tax purposes after they have been checked for accuracy and
@@ -240,7 +240,7 @@
 
       <div class="summary-master-container">
         <div class="summary-container g2">
-          <h2 class="summary-box-title" style="grid-column: 1 / span 2;"> Tax Year {{fyText}} Summary </h2>
+          <h2 class="summary-box-title"> Tax Year {{fyText}} Summary </h2>
           <div class="summary-item c1">
             Disposal Count:
           </div>
@@ -286,7 +286,7 @@
         </div>
 
         <div class="summary-container g2">
-          <h2 class="summary-box-title" style="grid-column: 1 / span 2;"> All Data Summary: </h2>
+          <h2 class="summary-box-title"> All Data Summary: </h2>
           <div class="summary-item c1">
             Disposal Count:
           </div>
@@ -326,7 +326,7 @@
         </div>
 
         <div v-if="deposits.length" class="summary-container g2">
-          <h2 class="summary-box-title" style="grid-column: 1 / span 2;"> Deposits </h2>
+          <h2 class="summary-box-title"> Deposits </h2>
           <template v-for="dep in deposits">
             <div class="summary-item c1">
               {{getDmyString(dep.timestamp)}}
@@ -338,7 +338,7 @@
         </div>
 
         <div v-if="withdrawals.length" class="summary-container g2">
-          <h2 class="summary-box-title" style="grid-column: 1 / span 2;"> Withdrawals </h2>
+          <h2 class="summary-box-title"> Withdrawals </h2>
           <template v-for="itm in withdrawals">
             <div class="summary-item c1">
               {{getDmyString(itm.timestamp)}}
@@ -362,14 +362,14 @@
 
       <div class="round-trip-master-container container">
         <h2 class="summary-box-title">{{fyText}} Round Trips</h2>
-        <h2 class="centre" style="margin:20px auto;" v-if="!taxYearData.roundTrips.length">No Round Trips Found</h2>
+        <h2 class="centre mb-20" v-if="!taxYearData.roundTrips.length">No Round Trips Found</h2>
         <div v-if="taxYearData.roundTrips.length">
           <div class="centre">
-            <div class="button" style="padding: 10px 30px;" v-on:click="uiRoundTripsExpand = !uiRoundTripsExpand">
+            <div class="button btn-expand" v-on:click="uiRoundTripsExpand = !uiRoundTripsExpand">
               {{uiRoundTripsExpand ? "Hide Round Trips" : "Show Round Trips"}}
             </div>
           </div>
-          <div v-show="uiRoundTripsExpand" class="round-trip-container" style="margin-top: 15px;">
+          <div v-show="uiRoundTripsExpand" class="round-trip-container">
             <h5 class="ledger-entry c1">Date Sold</h5>
             <h5 class="ledger-entry c2">Date Aquired</h5>
             <h5 class="ledger-entry c3">Asset</h5>
@@ -396,8 +396,8 @@
       <div v-if="dividends.length" class="dividends-container container">
         <h2 class="summary-box-title">Dividends</h2>
         
-        <div class="summary-container g2" style="max-width: 500px; margin: 0 auto 30px auto;">
-          <h2 class="summary-box-title" style="grid-column: 1 / span 2; border-bottom: none; margin-bottom: 5px;">Tax Year {{fyText}} Summary</h2>
+        <div class="summary-container g2 summary-container--compact">
+          <h2 class="summary-box-title summary-box-title--no-border">Tax Year {{fyText}} Summary</h2>
           <div class="summary-item c1">UK Companies Total:</div>
           <div class="summary-item c2">£{{divTyUkC}}</div>
           <div class="summary-item c1">UK Other (Funds/Trusts) Total:</div>
@@ -416,12 +416,12 @@
           <h5 class="ledger-entry c4" title="Is the dividend from a UK company or is it from a UK Trust/Fund/Other">UK Company?</h5>
           <template v-for="itm in dividends">
             <span v-if="itm.isUk && itm.ukCompany" class="ledger-entry c1">
-              {{getDmyString(itm.timestamp)}} <span v-if="itm.inTaxYear" style="color: var(--shade5); font-weight: bold; margin-left: 5px;">*</span>
+              {{getDmyString(itm.timestamp)}} <span v-if="itm.inTaxYear" class="tax-year-marker">*</span>
             </span>
             <span v-if="itm.isUk && itm.ukCompany" class="ledger-entry c2">{{itm.name}} ({{itm.ticker}})</span>
             <span v-if="itm.isUk && itm.ukCompany" class="ledger-entry c3">£{{itm.value.toFixed(2)}}</span>
-            <span v-if="itm.isUk && itm.ukCompany" class="ledger-entry c4" style="justify-content: center;">
-              <input type="checkbox" v-model="itm.ukCompany" style="cursor: pointer; transform: scale(1.3);">
+            <span v-if="itm.isUk && itm.ukCompany" class="ledger-entry c4 ledger-entry--action">
+              <input type="checkbox" v-model="itm.ukCompany">
             </span>
           </template>
         </div>
@@ -434,12 +434,12 @@
           <h5 class="ledger-entry c4" title="Is the dividend from a UK company or is it from a UK Trust/Fund/Other">UK Company?</h5>
           <template v-for="itm in dividends">
             <span v-if="itm.isUk && !itm.ukCompany" class="ledger-entry c1">
-              {{getDmyString(itm.timestamp)}} <span v-if="itm.inTaxYear" style="color: var(--shade5); font-weight: bold; margin-left: 5px;">*</span>
+              {{getDmyString(itm.timestamp)}} <span v-if="itm.inTaxYear" class="tax-year-marker">*</span>
             </span>
             <span v-if="itm.isUk && !itm.ukCompany" class="ledger-entry c2">{{itm.name}} ({{itm.ticker}})</span>
             <span v-if="itm.isUk && !itm.ukCompany" class="ledger-entry c3">£{{itm.value.toFixed(2)}}</span>
-            <span v-if="itm.isUk && !itm.ukCompany" class="ledger-entry c4" style="justify-content: center;">
-              <input type="checkbox" v-model="itm.ukCompany" style="cursor: pointer; transform: scale(1.3);">
+            <span v-if="itm.isUk && !itm.ukCompany" class="ledger-entry c4 ledger-entry--action">
+              <input type="checkbox" v-model="itm.ukCompany">
             </span>
           </template>
         </div>
@@ -452,7 +452,7 @@
           <h5 class="ledger-entry c4">Tax Paid</h5>
           <template v-for="itm in dividends">
             <span v-if="!itm.isUk" class="ledger-entry c1">
-              {{getDmyString(itm.timestamp)}} <span v-if="itm.inTaxYear" style="color: var(--shade5); font-weight: bold; margin-left: 5px;">*</span>
+              {{getDmyString(itm.timestamp)}} <span v-if="itm.inTaxYear" class="tax-year-marker">*</span>
             </span>
             <span v-if="!itm.isUk" class="ledger-entry c2">{{itm.name}} ({{itm.ticker}})</span>
             <span v-if="!itm.isUk" class="ledger-entry c3">£{{itm.value.toFixed(2)}}</span>
@@ -461,7 +461,7 @@
             </span>
           </template>
         </div>
-        <div style="font-size:0.8em; margin-top:10px; color: var(--shade7);"><strong>*</strong> = Included in {{fyText}} Tax Year</div>
+        <div class="footnote-muted"><strong>*</strong> = Included in {{fyText}} Tax Year</div>
       </div>
 
       <div class="holdings-master-container">
@@ -479,10 +479,10 @@
             </div>
             
             <div v-show="!inst.uiExpand" class="g4 collapsed-holding-summary">
-              <div class="r1 c1" style="font-weight: bold;">Total Realised Profit </div>
-              <div class="r1 c2" style="font-weight: bold;">{{fyText}} Realised Profit</div>
-              <div class="r1 c3" style="font-weight: bold;"> Trades </div>
-              <div class="r1 c4" style="font-weight: bold;"> Open Position</div>
+              <div class="r1 c1">Total Realised Profit </div>
+              <div class="r1 c2">{{fyText}} Realised Profit</div>
+              <div class="r1 c3"> Trades </div>
+              <div class="r1 c4"> Open Position</div>
               <div class="r2 c1">£{{inst.realisedPl.toFixed(2)}} </div>
               <div class="r2 c2">£{{(inst.tyData.realisedProfit - inst.tyData.realisedLoss).toFixed(2)}}</div>
               <div class="r2 c3"> {{inst.tradeCount}} </div>
@@ -490,7 +490,7 @@
             </div>
 
             <div v-show="inst.uiExpand" class="g5">
-              <h4 class="summary-box-subheading" style="grid-column: 1 / span 5;">All Data Summary</h4>
+              <h4 class="summary-box-subheading">All Data Summary</h4>
               <h5 class="c1">Open Position</h5>
               <h5 class="c2">Trade Count</h5>
               <h5 class="c3">Total Gain GBP</h5>
@@ -498,7 +498,7 @@
               <div class="c2" style="grid-column: 2; grid-row: 3;">{{inst.tradeCount}}</div>
               <div class="c3" style="grid-column: 3; grid-row: 3;">{{inst.realisedPl.toFixed(2)}}</div>
               
-              <h4 class="summary-box-subheading" style="grid-column: 1 / span 5; margin-top: 15px;">Tax Year Summary</h4>
+              <h4 class="summary-box-subheading summary-box-subheading--spaced">Tax Year Summary</h4>
               <h5 class="c1">Disposal Count</h5>
               <h5 class="c2">Realised Profit GBP</h5>
               <h5 class="c3">Realised Loss GBP</h5>
@@ -509,7 +509,7 @@
               <div class="c4" style="grid-column: 4; grid-row: 6;">{{(inst.tyData.realisedProfit - inst.tyData.realisedLoss).toFixed(2)}}</div>
             </div>
 
-            <h4 v-show="inst.uiExpand" class="summary-box-subheading" style="margin-top: 20px;">Trade Log</h4>
+            <h4 v-show="inst.uiExpand" class="summary-box-subheading summary-box-subheading--trade-log">Trade Log</h4>
             <div v-show="inst.uiExpand" class="trade-container">
               <h5 class="ledger-entry c1">ID</h5>
               <h5 class="ledger-entry c2">Date</h5>
@@ -527,7 +527,7 @@
               </template>
             </div>
 
-            <h4 v-show="inst.uiExpand" class="summary-box-subheading" style="margin-top: 20px;">Calculation Ledger</h4>
+            <h4 v-show="inst.uiExpand" class="summary-box-subheading summary-box-subheading--trade-log">Calculation Ledger</h4>
             <div v-show="inst.uiExpand" class="disposal-container">
               <h5 class="ledger-entry ledger-uid">ID</h5>
               <h5 class="ledger-entry ledger-date">Date</h5>
@@ -549,7 +549,7 @@
                 <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-s104p">{{d.s104Price.toFixed(2)}}</span>
                 <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-comment">
                   <template v-for="comm in d.comment">
-                    <p style="margin: 0;">{{comm}}</p>
+                    <p class="ledger-comment">{{comm}}</p>
                   </template>
                 </span>
               </template>
@@ -563,8 +563,7 @@
       </div>
     </div>
 
-    <div style="height:40px"></div>
-    <div style="margin:0 40px">
+    <div class="page-footer">
       <p class="centre">THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
         IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
         FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
