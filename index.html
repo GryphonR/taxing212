@@ -481,7 +481,7 @@
           <h5 class="ledger-entry c4" title="Is the dividend from a UK company or is it from a UK Trust/Fund/Other">UK Company?</h5>
           <template v-for="itm in dividends">
             <span v-if="itm.isUk && itm.ukCompany" class="ledger-entry c1">
-              {{getDmyString(itm.timestamp)}} <span v-if="itm.inTaxYear" style="color: var(--shade5); font-weight: bold; margin-left: 5px;">*</span>
+              {{getDmyString(itm.timestamp)}} <span v-if="itm.inTaxYear" style="color: var(--brand); font-weight: bold; margin-left: 5px;">*</span>
             </span>
             <span v-if="itm.isUk && itm.ukCompany" class="ledger-entry c2">{{itm.name}} ({{itm.ticker}})</span>
             <span v-if="itm.isUk && itm.ukCompany" class="ledger-entry c3">£{{itm.value.toFixed(2)}}</span>
@@ -499,7 +499,7 @@
           <h5 class="ledger-entry c4" title="Is the dividend from a UK company or is it from a UK Trust/Fund/Other">UK Company?</h5>
           <template v-for="itm in dividends">
             <span v-if="itm.isUk && !itm.ukCompany" class="ledger-entry c1">
-              {{getDmyString(itm.timestamp)}} <span v-if="itm.inTaxYear" style="color: var(--shade5); font-weight: bold; margin-left: 5px;">*</span>
+              {{getDmyString(itm.timestamp)}} <span v-if="itm.inTaxYear" style="color: var(--brand); font-weight: bold; margin-left: 5px;">*</span>
             </span>
             <span v-if="itm.isUk && !itm.ukCompany" class="ledger-entry c2">{{itm.name}} ({{itm.ticker}})</span>
             <span v-if="itm.isUk && !itm.ukCompany" class="ledger-entry c3">£{{itm.value.toFixed(2)}}</span>
@@ -517,7 +517,7 @@
           <h5 class="ledger-entry c4">Tax Paid</h5>
           <template v-for="itm in dividends">
             <span v-if="!itm.isUk" class="ledger-entry c1">
-              {{getDmyString(itm.timestamp)}} <span v-if="itm.inTaxYear" style="color: var(--shade5); font-weight: bold; margin-left: 5px;">*</span>
+              {{getDmyString(itm.timestamp)}} <span v-if="itm.inTaxYear" style="color: var(--brand); font-weight: bold; margin-left: 5px;">*</span>
             </span>
             <span v-if="!itm.isUk" class="ledger-entry c2">{{itm.name}} ({{itm.ticker}})</span>
             <span v-if="!itm.isUk" class="ledger-entry c3">£{{itm.value.toFixed(2)}}</span>
@@ -526,7 +526,7 @@
             </span>
           </template>
         </div>
-        <div style="font-size:0.8em; margin-top:10px; color: var(--shade7);"><strong>*</strong> = Included in {{fyText}} Tax Year</div>
+        <div style="font-size:0.8em; margin-top:10px; color: var(--text-secondary);"><strong>*</strong> = Included in {{fyText}} Tax Year</div>
       </div>
 
       <div class="holdings-master-container">
