@@ -43,6 +43,8 @@
         corpActionForm: { type: 'Split', date: '', ticker: '', ratio: '', newTicker: '', newName: '' },
         corpActions: [],
         acceptedDisclaimer: false,
+        disclaimerError: false,
+        showHowItWorks: false,
         isDraggingFile: false,
         activeResultsTab: "dashboard",
         showErrorsOnly: false,
@@ -95,6 +97,11 @@
           if (this.calculated) {
             this.recalculateTaxYearData();
             this.$nextTick(() => this.renderCharts());
+          }
+        },
+        acceptedDisclaimer: function (accepted) {
+          if (accepted) {
+            this.disclaimerError = false;
           }
         }
       },
@@ -1009,9 +1016,11 @@
           let t = this;
 
           if (!this.acceptedDisclaimer) {
-            alert("Please accept the disclaimer before calculating.");
+            this.disclaimerError = true;
             return;
           }
+
+          this.disclaimerError = false;
 
           this.resetCalculations();
           this.persistBnbNonResidentPeriods();
