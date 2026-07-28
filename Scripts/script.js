@@ -44,6 +44,8 @@
         corpActions: [],
         acceptedDisclaimer: false,
         disclaimerError: false,
+        calculateError: "",
+        exportError: "",
         showHowItWorks: false,
         isDraggingFile: false,
         activeResultsTab: "dashboard",
@@ -236,6 +238,7 @@
           this.manualTrades.push({ uid: 'MANUAL-' + Date.now(), ...this.manualTradeForm });
           localStorage.setItem('manualTrades', JSON.stringify(this.manualTrades));
           this.manualTradeForm = { date: '', action: 'Buy', ticker: '', name: '', shares: '', price: '' };
+          this.calculateError = "";
         },
         removeManualTrade(uid) {
           this.manualTrades = this.manualTrades.filter(m => m.uid !== uid);
@@ -338,6 +341,9 @@
             type: type,
             message: message
           };
+          if (type === "success") {
+            this.calculateError = "";
+          }
         },
         formatCurrency(value) {
           const num = Number(value || 0);
@@ -927,8 +933,10 @@
           }
         },
         downloadFullSummary() {
+          this.exportError = "";
+
           if (typeof XLSX === 'undefined') {
-            alert('Export library is still loading, please try again in a moment.');
+            this.exportError = "Export library is still loading. Please try again in a moment.";
             return;
           }
 
@@ -1021,6 +1029,7 @@
           }
 
           this.disclaimerError = false;
+          this.calculateError = "";
 
           this.resetCalculations();
           this.persistBnbNonResidentPeriods();
@@ -1061,7 +1070,7 @@
           }
 
           if (allRawTrades.length === 0) {
-            alert("No trades found - add CSVs or Manual Trades and try again.");
+            this.calculateError = "No trades found — add CSV files or manual trades and try again.";
             return;
           }
 

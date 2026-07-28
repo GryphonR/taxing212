@@ -85,13 +85,13 @@
         <div v-show="activeInputTab === 'manual'" role="tabpanel">
           <p>Add manual trades here to account for in-specie transfers from other brokers.</p>
           <div class="dividend-table" style="grid-template-columns: 1.5fr 1fr 1fr 1.5fr 1fr 1fr 80px; align-items: center;">
-            <h5 class="ledger-entry">Date/Time</h5>
-            <h5 class="ledger-entry">Action</h5>
-            <h5 class="ledger-entry">Ticker</h5>
-            <h5 class="ledger-entry">Name</h5>
-            <h5 class="ledger-entry">Shares</h5>
-            <h5 class="ledger-entry">Price (£)</h5>
-            <h5 class="ledger-entry"></h5>
+            <label class="ledger-entry form-grid-header" for="manual-trade-date">Date/Time</label>
+            <label class="ledger-entry form-grid-header" for="manual-trade-action">Action</label>
+            <label class="ledger-entry form-grid-header" for="manual-trade-ticker">Ticker</label>
+            <label class="ledger-entry form-grid-header" for="manual-trade-name">Name</label>
+            <label class="ledger-entry form-grid-header" for="manual-trade-shares">Shares</label>
+            <label class="ledger-entry form-grid-header" for="manual-trade-price">Price (£)</label>
+            <span class="ledger-entry"><span class="sr-only">Remove trade</span></span>
 
             <template v-for="mt in manualTrades">
               <span class="ledger-entry">{{mt.date.replace('T', ' ')}}</span>
@@ -103,17 +103,17 @@
               <span class="ledger-entry" style="justify-content: center;"><button type="button" class="file-remove-button" :aria-label="'Remove manual trade ' + mt.ticker" @click.prevent="removeManualTrade(mt.uid)">×</button></span>
             </template>
 
-            <span class="ledger-entry"><input type="datetime-local" v-model="manualTradeForm.date" style="width: 100%; box-sizing: border-box;"></span>
+            <span class="ledger-entry"><input id="manual-trade-date" type="datetime-local" class="form-grid-input" v-model="manualTradeForm.date"></span>
             <span class="ledger-entry">
-              <select v-model="manualTradeForm.action" style="width: 100%; box-sizing: border-box;">
+              <select id="manual-trade-action" class="form-grid-input" v-model="manualTradeForm.action">
                 <option>Buy</option>
                 <option>Sell</option>
               </select>
             </span>
-            <span class="ledger-entry"><input type="text" list="portfolio-tickers" placeholder="Ticker" v-model="manualTradeForm.ticker" @change="autoFillManualName" style="width: 100%; box-sizing: border-box;"></span>
-            <span class="ledger-entry"><input type="text" placeholder="Name (opt)" v-model="manualTradeForm.name" style="width: 100%; box-sizing: border-box;"></span>
-            <span class="ledger-entry"><input type="number" step="0.00000001" placeholder="Shares" v-model.number="manualTradeForm.shares" style="width: 100%; box-sizing: border-box;"></span>
-            <span class="ledger-entry"><input type="number" step="0.01" placeholder="Price" v-model.number="manualTradeForm.price" style="width: 100%; box-sizing: border-box;"></span>
+            <span class="ledger-entry"><input id="manual-trade-ticker" type="text" list="portfolio-tickers" placeholder="Ticker" class="form-grid-input" v-model="manualTradeForm.ticker" @change="autoFillManualName"></span>
+            <span class="ledger-entry"><input id="manual-trade-name" type="text" placeholder="Name (opt)" class="form-grid-input" v-model="manualTradeForm.name"></span>
+            <span class="ledger-entry"><input id="manual-trade-shares" type="number" step="0.00000001" placeholder="Shares" class="form-grid-input" v-model.number="manualTradeForm.shares"></span>
+            <span class="ledger-entry"><input id="manual-trade-price" type="number" step="0.01" placeholder="Price" class="form-grid-input" v-model.number="manualTradeForm.price"></span>
             <span class="ledger-entry" style="justify-content: center;"><button type="button" class="button btn-secondary btn-compact" :disabled="!isManualTradeValid" @click="addManualTrade">Add</button></span>
           </div>
         </div>
@@ -121,12 +121,12 @@
         <div v-show="activeInputTab === 'corp'" role="tabpanel">
           <p>Map corporate actions (like Stock Splits or Mergers). The app will retrospectively apply these to your ledger.</p>
           <div class="dividend-table" style="grid-template-columns: 1fr 1.5fr 1fr 1.5fr 2fr 80px; align-items: center;">
-            <h5 class="ledger-entry">Type</h5>
-            <h5 class="ledger-entry">Effective Date</h5>
-            <h5 class="ledger-entry">Ticker</h5>
-            <h5 class="ledger-entry">Action/Ratio</h5>
-            <h5 class="ledger-entry">New Ticker/Name</h5>
-            <h5 class="ledger-entry"></h5>
+            <label class="ledger-entry form-grid-header" for="corp-action-type">Type</label>
+            <label class="ledger-entry form-grid-header" for="corp-action-date">Effective Date</label>
+            <label class="ledger-entry form-grid-header" for="corp-action-ticker">Ticker</label>
+            <span class="ledger-entry form-grid-header">Action/Ratio</span>
+            <span class="ledger-entry form-grid-header">New Ticker/Name</span>
+            <span class="ledger-entry"><span class="sr-only">Remove corporate action</span></span>
 
             <template v-for="ca in corpActions">
               <span class="ledger-entry">{{ca.type}}</span>
@@ -138,21 +138,26 @@
             </template>
 
             <span class="ledger-entry">
-              <select v-model="corpActionForm.type" style="width: 100%; box-sizing: border-box;">
+              <select id="corp-action-type" class="form-grid-input" v-model="corpActionForm.type">
                 <option>Split</option>
                 <option>Rename</option>
               </select>
             </span>
-            <span class="ledger-entry"><input type="date" v-model="corpActionForm.date" style="width: 100%; box-sizing: border-box;"></span>
-            <span class="ledger-entry"><input type="text" list="portfolio-tickers" placeholder="Ticker" v-model="corpActionForm.ticker" style="width: 100%; box-sizing: border-box;"></span>
+            <span class="ledger-entry"><input id="corp-action-date" type="date" class="form-grid-input" v-model="corpActionForm.date"></span>
+            <span class="ledger-entry"><input id="corp-action-ticker" type="text" list="portfolio-tickers" placeholder="Ticker" class="form-grid-input" v-model="corpActionForm.ticker"></span>
             <span class="ledger-entry">
-              <input v-if="corpActionForm.type === 'Split'" type="number" step="0.01" placeholder="Ratio (e.g. 4)" v-model.number="corpActionForm.ratio" style="width: 100%; box-sizing: border-box;">
+              <template v-if="corpActionForm.type === 'Split'">
+                <label class="sr-only" for="corp-action-ratio">Split ratio (e.g. 4 for a 4-for-1 split)</label>
+                <input id="corp-action-ratio" type="number" step="0.01" placeholder="Ratio (e.g. 4)" class="form-grid-input" v-model.number="corpActionForm.ratio">
+              </template>
               <span v-else>-</span>
             </span>
             <span class="ledger-entry">
               <div v-if="corpActionForm.type === 'Rename'" style="display: flex; gap: 5px; width: 100%;">
-                <input type="text" placeholder="New Ticker" v-model="corpActionForm.newTicker" style="width: 50%; box-sizing: border-box;">
-                <input type="text" placeholder="New Name" v-model="corpActionForm.newName" style="width: 50%; box-sizing: border-box;">
+                <label class="sr-only" for="corp-action-new-ticker">New ticker after rename</label>
+                <input id="corp-action-new-ticker" type="text" placeholder="New Ticker" class="form-grid-input" v-model="corpActionForm.newTicker" style="width: 50%;">
+                <label class="sr-only" for="corp-action-new-name">New name after rename</label>
+                <input id="corp-action-new-name" type="text" placeholder="New Name" class="form-grid-input" v-model="corpActionForm.newName" style="width: 50%;">
               </div>
               <span v-else>-</span>
             </span>
@@ -216,6 +221,7 @@
             <label for="acceptDisclaimer">I have read and accept the <a href="#disclaimer">disclaimer</a></label>
           </div>
           <p v-if="disclaimerError" class="field-error" role="alert">Please accept the disclaimer before calculating.</p>
+          <p v-if="calculateError" class="field-error" role="alert">{{calculateError}}</p>
           <button type="button" class="button btn-primary" :disabled="!acceptedDisclaimer" v-on:click="calculate()">Calculate</button>
         </div>
       </div>
@@ -274,6 +280,7 @@
         </select>
         <button type="button" class="button btn-primary" v-on:click="downloadFullSummary()">Download Full Summary</button>
       </div>
+      <p v-if="exportError" class="field-error centre" role="alert">{{exportError}}</p>
 
       <p class="disclaimer-banner centre">These calculations may be used for tax purposes after they have been checked for accuracy and completeness by yourself or your tax advisor.</p>
 

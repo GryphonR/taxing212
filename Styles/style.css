@@ -674,6 +674,11 @@
       box-sizing: border-box;
     }
 
+    .form-grid-header {
+      font-weight: bold;
+      cursor: pointer;
+    }
+
     .radio-group {
       display: flex;
       flex-wrap: wrap;
