@@ -43,6 +43,10 @@
         corpActionForm: { type: 'Split', date: '', ticker: '', ratio: '', newTicker: '', newName: '' },
         corpActions: [],
         acceptedDisclaimer: false,
+        disclaimerError: false,
+        calculateError: "",
+        exportError: "",
+        showHowItWorks: false,
         isDraggingFile: false,
         activeResultsTab: "dashboard",
         showErrorsOnly: false,
@@ -87,13 +91,19 @@
         divUkOthersList: {},
         freeShares: [],
         holdings: {},
-        rtHolder: ""
+        bnbNonResidentPeriods: [],
+        bnbResidenceMode: 'always',
       },
       watch: {
         'taxYear.target': function () {
           if (this.calculated) {
             this.recalculateTaxYearData();
             this.$nextTick(() => this.renderCharts());
+          }
+        },
+        acceptedDisclaimer: function (accepted) {
+          if (accepted) {
+            this.disclaimerError = false;
           }
         }
       },
@@ -111,6 +121,10 @@
           }
           if (localStorage.getItem("corpActions") != null) {
             this.corpActions = JSON.parse(localStorage.getItem("corpActions"));
+          }
+          if (localStorage.getItem("bnbNonResidentPeriods") != null) {
+            this.bnbNonResidentPeriods = JSON.parse(localStorage.getItem("bnbNonResidentPeriods"));
+            this.bnbResidenceMode = this.bnbNonResidentPeriods.length ? 'periods' : 'always';
           }
         });
 
@@ -224,6 +238,7 @@
           this.manualTrades.push({ uid: 'MANUAL-' + Date.now(), ...this.manualTradeForm });
           localStorage.setItem('manualTrades', JSON.stringify(this.manualTrades));
           this.manualTradeForm = { date: '', action: 'Buy', ticker: '', name: '', shares: '', price: '' };
+          this.calculateError = "";
         },
         removeManualTrade(uid) {
           this.manualTrades = this.manualTrades.filter(m => m.uid !== uid);
@@ -238,6 +253,44 @@
         removeCorpAction(uid) {
           this.corpActions = this.corpActions.filter(c => c.uid !== uid);
           localStorage.setItem('corpActions', JSON.stringify(this.corpActions));
+        },
+        setBnbResidenceMode(mode) {
+          this.bnbResidenceMode = mode;
+          if (mode === 'always') {
+            this.bnbNonResidentPeriods = [];
+            localStorage.removeItem('bnbNonResidentPeriods');
+          } else if (!this.bnbNonResidentPeriods.length) {
+            this.addBnbNonResidentPeriod();
+          }
+        },
+        addBnbNonResidentPeriod() {
+          this.bnbNonResidentPeriods.push({ uid: 'RES-' + Date.now(), from: '', to: '' });
+          this.persistBnbNonResidentPeriods();
+        },
+        removeBnbNonResidentPeriod(uid) {
+          this.bnbNonResidentPeriods = this.bnbNonResidentPeriods.filter(period => period.uid !== uid);
+          this.persistBnbNonResidentPeriods();
+        },
+        persistBnbNonResidentPeriods() {
+          if (this.bnbResidenceMode === 'always' || !this.bnbNonResidentPeriods.length) {
+            localStorage.removeItem('bnbNonResidentPeriods');
+            return;
+          }
+          localStorage.setItem('bnbNonResidentPeriods', JSON.stringify(this.bnbNonResidentPeriods));
+        },
+        getBnbNonResidentPeriodMillis() {
+          if (this.bnbResidenceMode === 'always') {
+            return [];
+          }
+
+          return this.bnbNonResidentPeriods.map(function (period) {
+            return {
+              from: period.from ? TaxMath.ukCalendarDayStartMillis(period.from) : NaN,
+              to: period.to ? TaxMath.ukCalendarDayEndMillis(period.to) : null
+            };
+          }).filter(function (period) {
+            return !isNaN(period.from);
+          });
         },
         normaliseHeaderName(header) {
           return header == null ? "" : String(header).trim().toLowerCase();
@@ -288,6 +341,9 @@
             type: type,
             message: message
           };
+          if (type === "success") {
+            this.calculateError = "";
+          }
         },
         formatCurrency(value) {
           const num = Number(value || 0);
@@ -527,36 +583,13 @@
           this.uiRoundTripsExpand = false;
         },
         setTaxYearBounds(targetYear) {
-          let a = Number(targetYear);
-          let b = Number(targetYear) + 1;
-
-          let startDate = new Date();
-          startDate.setTime(0);
-          let endDate = new Date();
-          endDate.setTime(0);
-          startDate.setDate(6);
-          startDate.setMonth(3);
-          startDate.setFullYear(a);
-          endDate.setDate(5);
-          endDate.setMonth(3);
-          endDate.setFullYear(b);
-          let endPlusThirty = new Date(endDate.getTime());
-          endPlusThirty.setDate(endPlusThirty.getDate() + 30);
-
-          this.taxYear.start = startDate.getTime();
-          this.taxYear.end = endDate.getTime();
-          this.taxYear.p30 = endPlusThirty.getTime();
+          const bounds = TaxMath.getTaxYearBounds(targetYear);
+          this.taxYear.start = bounds.start;
+          this.taxYear.end = bounds.end;
+          this.taxYear.p30 = bounds.p30;
         },
         getTaxYearFromTimestamp(timestamp) {
-          let date = new Date(timestamp);
-          let year = date.getUTCFullYear();
-          let month = date.getUTCMonth();
-          let day = date.getUTCDate();
-
-          if (month < 3 || (month === 3 && day < 6)) {
-            return year - 1;
-          }
-          return year;
+          return TaxMath.getTaxYearFromTimestamp(timestamp);
         },
         buildAvailableTaxYears() {
           let taxYears = {};
@@ -643,6 +676,13 @@
               this.taxYearData.dividends += div.value;
             }
           }
+
+          const foreignDividends = TaxMath.recalculateForeignDividendDetails(
+            this.dividends,
+            (timestamp) => this.inTaxYear(timestamp)
+          );
+          this.dividendDetails.nonUk = foreignDividends.nonUk;
+          this.dividendDetails.taxPaid = foreignDividends.taxPaid;
 
           for (let i = 0; i < this.allRoundTrips.length; i++) {
             let trip = this.allRoundTrips[i];
@@ -770,29 +810,12 @@
         getUID() {
           return UID++;
         },
-        sameDay(ref, test) { //returns true if dates are in the same day
-          ref = luxon.DateTime.fromMillis(ref);
-          test = luxon.DateTime.fromMillis(test);
-
-          if (ref.year != test.year) {
-            return false;
-          } else if (ref.month != test.month) {
-            return false
-          } else if (ref.day != test.day) {
-            return false;
-          } else {
-            return true;
-          }
-
+        sameDay(ref, test) {
+          return TaxMath.sameDay(ref, test);
         },
         inTaxYear(timestamp) {
           this.setTaxYearBounds(this.taxYear.target);
-          // tax year check
-          if (timestamp >= this.taxYear.start && timestamp <= this.taxYear.end) {
-            return 1;
-          } else {
-            return 0;
-          }
+          return TaxMath.inTaxYear(timestamp, this.taxYear) ? 1 : 0;
         },
         //Date must be formatted as YYYY-MMM-DD optionally YYY-MM-DDTHH:MM:SS
         getTimestamp(date) { // Takes in a datestring returns UTC Seconds
@@ -910,8 +933,10 @@
           }
         },
         downloadFullSummary() {
+          this.exportError = "";
+
           if (typeof XLSX === 'undefined') {
-            alert('Export library is still loading, please try again in a moment.');
+            this.exportError = "Export library is still loading. Please try again in a moment.";
             return;
           }
 
@@ -999,9 +1024,15 @@
           let t = this;
 
           if (!this.acceptedDisclaimer) {
-            alert("Please accept the disclaimer before calculating.");
+            this.disclaimerError = true;
             return;
           }
+
+          this.disclaimerError = false;
+          this.calculateError = "";
+
+          this.resetCalculations();
+          this.persistBnbNonResidentPeriods();
 
           let allRawTrades = [];
 
@@ -1039,7 +1070,7 @@
           }
 
           if (allRawTrades.length === 0) {
-            alert("No trades found - add CSVs or Manual Trades and try again.");
+            this.calculateError = "No trades found — add CSV files or manual trades and try again.";
             return;
           }
 
@@ -1181,27 +1212,49 @@
             rawTradeType = "Buy";
           }
 
+          const numberOfShares = this.getNumber(this.getTradeValue(trade, "numberOfShares", 5));
+          const pricePerShare = this.getNumber(this.getTradeValue(trade, "pricePerShare", 6));
+          const exchangeRate = this.getNumber(this.getTradeValue(trade, "exchangeRate", 8)) || 1;
+          const totalGbp = this.getNumber(this.getTradeValue(trade, "totalGbp", 10));
+          const stampDuty = this.getNumber(this.getTradeValue(trade, "stampDutyReserveTaxGbp", 14));
+          const transactionFee = this.getNumber(this.getTradeValue(trade, "transactionFeeGbp", 15));
+          const finraFee = this.getNumber(this.getTradeValue(trade, "finraFeeGbp", 16));
+          const frenchTransactionTax = this.getNumber(this.getTradeValue(trade, "frenchTransactionTax", 19));
+          const priceGBP = TaxMath.effectivePricePerShare(
+            rawTradeType,
+            numberOfShares,
+            pricePerShare,
+            exchangeRate,
+            totalGbp,
+            {
+              stampDuty: stampDuty,
+              transactionFee: transactionFee,
+              finraFee: finraFee,
+              frenchTransactionTax: frenchTransactionTax
+            }
+          );
+
           let temp = {
             uid: this.getUID(),
             timestamp: this.getTimestamp(this.getTradeValue(trade, "time", 1)),
             dateString: this.getTradeValue(trade, "time", 1),
             orderType: this.getTradeValue(trade, "action", 0),
             rawType: rawTradeType,
-            value: this.getNumber(this.getTradeValue(trade, "totalGbp", 10)),
-            number: this.getNumber(this.getTradeValue(trade, "numberOfShares", 5)),
-            price: this.getNumber(this.getTradeValue(trade, "pricePerShare", 6)),
-            priceGBP: this.safeDiv(this.getNumber(this.getTradeValue(trade, "pricePerShare", 6)), this.getNumber(this.getTradeValue(trade, "exchangeRate", 8)) || 1),
-            exchangeRate: this.getNumber(this.getTradeValue(trade, "exchangeRate", 8)) || 1,
+            value: totalGbp,
+            number: numberOfShares,
+            price: pricePerShare,
+            priceGBP: priceGBP,
+            exchangeRate: exchangeRate,
             result: this.getNumber(this.getTradeValue(trade, "resultGbp", 9)),
-            total: this.getNumber(this.getTradeValue(trade, "totalGbp", 10)),
+            total: totalGbp,
             withholdingTax: this.getNumber(this.getTradeValue(trade, "withholdingTax", 11)),
             wthTaxCurrency: this.getTradeValue(trade, "withholdingTaxCurrency", 12),
-            stampDuty: this.getNumber(this.getTradeValue(trade, "stampDutyReserveTaxGbp", 14)),
-            transactionFee: this.getNumber(this.getTradeValue(trade, "transactionFeeGbp", 15)),
-            finraFee: this.getNumber(this.getTradeValue(trade, "finraFeeGbp", 16)),
+            stampDuty: stampDuty,
+            transactionFee: transactionFee,
+            finraFee: finraFee,
             notes: this.getTradeValue(trade, "notes", 17),
             t212ID: this.getTradeValue(trade, "id", 18),
-            frenchTransactionTax: this.getNumber(this.getTradeValue(trade, "frenchTransactionTax", 19)),
+            frenchTransactionTax: frenchTransactionTax,
             wasFree: false,
             inLedger: 0,
           };
@@ -1265,337 +1318,37 @@
           this.holdings = Object.fromEntries(Object.entries(this.holdings).sort(([, a], [, b]) => a.trades[0].timestamp - b.trades[0].timestamp));
         },
         populateLedger() {
-          const ledgerProto = {
-            uid: 0,
-            timestamp: 0,
-            change: 0, 
-            price: 0, 
-            exchangeRate: 0,
-            tradeCount: 0, 
-            tradeIDs: [], 
-            comment: [],
-            counted: 0, 
-            gain: 0,
-            loss: 0,
-            totalPnl: 0,
-            s104Total: 0,
-            s104Price: 0,
-            taxable: 0,
-            matchedUid: "", 
-            rule: "", 
-            inTaxYear: 0, 
-            sdltPaid: 0 
-          }
-
-          for (let key in this.holdings) { 
-            var holding = this.holdings[key]; 
-            for (let tradeKey in holding.trades) { 
-              var t = holding.trades[tradeKey];
-
-              if (!t.inLedger) { 
-                let temp = JSON.parse(JSON.stringify(ledgerProto));
-                temp.uid = this.getUID();
-                temp.timestamp = t.timestamp;
-                temp.change = t.rawType == "Buy" ? t.number : -t.number;
-                temp.price = t.priceGBP;
-                temp.tradeCount = 1;
-                temp.tradeIDs.push(t.uid);
-                holding.ledger.push(temp);
-                t.inLedger = 1; 
-              }
-
-              let ledgerIndex = holding.ledger.length - 1; 
-              let currTradeType = t.rawType;
-
-              for (let i in holding.trades) {
-                let compTrade = holding.trades[i];
-                if (!compTrade.inLedger) { 
-                  if (compTrade.rawType === currTradeType) { 
-                    if (this.sameDay(t.timestamp, compTrade.timestamp)) {
-                      holding.ledger[ledgerIndex].tradeIDs.push(compTrade.uid);
-                      holding.ledger[ledgerIndex].tradeCount++;
-
-                      let currNP = this.safeMult(holding.ledger[ledgerIndex].change, holding.ledger[ledgerIndex].price); 
-                      let newTradeChange = compTrade.rawType == "Buy" ? compTrade.number : -compTrade.number;
-                      let newNP = this.safeMult(Math.abs(newTradeChange), Math.abs(compTrade.priceGBP));
-
-                      holding.ledger[ledgerIndex].change = this.safeAdd(holding.ledger[ledgerIndex].change, newTradeChange); 
-                      holding.ledger[ledgerIndex].priceGBP = this.safeDiv(this.safeAdd(currNP, newNP), Math.abs(holding.ledger[ledgerIndex].change));
-
-                      compTrade.inLedger = 1; 
-                      if (holding.ledger[ledgerIndex].tradeCount > 2) holding.ledger[ledgerIndex].comment.pop();
-                      holding.ledger[ledgerIndex].comment.push(`${holding.ledger[ledgerIndex].tradeCount} trades merged for Same Day Rule.`);
-                    }
-                  }
-                }
-              }
-            }
-          }
+          DisposalEngine.populateLedger(this.holdings, {
+            getUID: () => this.getUID(),
+            sameDay: (ref, test) => this.sameDay(ref, test),
+            safeAdd: (a, b) => this.safeAdd(a, b),
+            safeSub: (a, b) => this.safeSub(a, b),
+            safeMult: (a, b) => this.safeMult(a, b),
+            safeDiv: (a, b) => this.safeDiv(a, b)
+          });
         },
         calculateDisposals() {
-          for (let key in this.holdings) { 
-            var holding = this.holdings[key];
+          const result = DisposalEngine.calculateDisposals(this.holdings, {
+            getUID: () => this.getUID(),
+            sameDay: (ref, test) => this.sameDay(ref, test),
+            inTaxYear: (timestamp) => this.inTaxYear(timestamp),
+            nonResidentPeriods: this.getBnbNonResidentPeriodMillis(),
+            safeAdd: (a, b) => this.safeAdd(a, b),
+            safeSub: (a, b) => this.safeSub(a, b),
+            safeMult: (a, b) => this.safeMult(a, b),
+            safeDiv: (a, b) => this.safeDiv(a, b),
+            errorList: this.errorList,
+            taxYear: this.taxYear
+          });
 
-            for (let i in holding.ledger) {
-              let sell = holding.ledger[i];
-
-              if (sell.change < 0 && !sell.counted) { 
-                for (let j in holding.ledger) {
-                  let buy = holding.ledger[j];
-                  if (this.sameDay(sell.timestamp, buy.timestamp) && buy.change > 0 && !buy.counted) {
-                    if ((sell.change + buy.change) === 0) {
-                      let tmp = this.safeSub(this.safeMult(Math.abs(sell.change), sell.price), this.safeMult(buy.change, buy.price));
-                      if (tmp > 0) {
-                        sell.gain = tmp;
-                      } else {
-                        sell.loss = Math.abs(tmp);
-                      }
-                      sell.comment.push(`Same Day Disposal counted against buy ${buy.uid}`);
-                      sell.rule = "Same Day";
-                      sell.totalPnl = tmp;
-                      sell.taxable = 1;
-                      sell.matchedUid = buy.uid;
-                      sell.counted = 1;
-                      buy.counted = 1;
-                    } else {
-                      if (Math.abs(sell.change) > buy.change) { 
-                        sell.comment.push(`Entry split for sameday rule matching Buy entry #${buy.uid}`);
-                        let sellCopy = JSON.parse(JSON.stringify(sell));
-                        sellCopy.uid = this.getUID();
-                        sell.change = -buy.change;
-                        sellCopy.change = this.safeSub(sellCopy.change, sell.change);
-
-                        holding.ledger.splice(i, 0, sellCopy);
-
-                        let tmp = this.safeSub(this.safeMult(Math.abs(sell.change), sell.price), this.safeMult(buy.change, buy.price));
-                        if (tmp > 0) {
-                          sell.gain = tmp;
-                        } else {
-                          sell.loss = Math.abs(tmp);
-                        }
-
-                        sell.comment.push(`Same Day Disposal counted against buy ${buy.uid}`);
-                        sell.rule = "Same Day";
-                        sell.totalPnl = tmp;
-                        sell.taxable = 1;
-                        sell.matchedUid = buy.uid;
-                        sell.counted = 1;
-                        buy.counted = 1;
-
-                      } else { 
-                        buy.comment.push(`Entry split for sameday rule matching Sell entry #${sell.uid}`);
-                        let buyCopy = JSON.parse(JSON.stringify(buy));
-                        buyCopy.uid = this.getUID();
-                        buy.change = Math.abs(sell.change);
-                        buyCopy.change = this.safeSub(buyCopy.change, buy.change);
-
-                        let tmp = this.safeSub(this.safeMult(Math.abs(sell.change), sell.price), this.safeMult(buy.change, buy.price));
-                        if (tmp > 0) {
-                          sell.gain = tmp;
-                        } else {
-                          sell.loss = Math.abs(tmp);
-                        }
-
-                        sell.comment.push(`Same Day Disposal counted against buy ${buy.uid}`);
-                        sell.rule = "Same Day";
-                        sell.totalPnl = tmp;
-                        sell.taxable = 1;
-                        sell.matchedUid = buy.uid;
-
-                        holding.ledger.splice(j, 0, buyCopy);
-                        sell.counted = 1;
-                        buy.counted = 1;
-                      }
-                    }
-                  }
-                }
-              }
-            }
-
-            for (let i in holding.ledger) {
-              let buy = holding.ledger[i];
-
-              if (buy.change > 0 && !buy.counted) { 
-                let thirtyDays = 1000 * 60 * 60 * 24 * 30;
-                let cutOff = buy.timestamp - thirtyDays;
-
-                for (let j in holding.ledger) {
-                  let sell = holding.ledger[j];
-                  if (sell.change < 0 && !sell.counted) { 
-                    if (sell.timestamp > cutOff && sell.timestamp < buy.timestamp) {
-                      if (sell.change + buy.change === 0) { 
-                        sell.counted = 1;
-                        sell.comment.push(`30 day BnB rule, counted against Buy #${buy.uid}`);
-                        buy.counted = 1;
-                        buy.comment.push(`30 day BnB rule, counted against Sell #${sell.uid}`);
-
-                        let tmp = this.safeSub(this.safeMult(Math.abs(sell.change), sell.price), this.safeMult(buy.change, buy.price));
-
-                        if (tmp > 0) {
-                          buy.gain = tmp;
-                        } else {
-                          buy.loss = Math.abs(tmp);
-                        }
-
-                        sell.rule = "30 Day BnB";
-                        sell.totalPnl = tmp;
-                        sell.taxable = 1;
-                        sell.matchedUid = buy.uid;
-
-                      } else if (sell.change + buy.change < 0) { 
-                        let sellCopy = JSON.parse(JSON.stringify(sell));
-                        sellCopy.uid = this.getUID();
-
-                        sell.change = -buy.change;
-                        sellCopy.change = this.safeSub(sellCopy.change, sell.change);
-                        sell.counted = 1;
-                        buy.counted = 1;
-                        buy.comment.push(`30 day BnB rule, counted against Sell #${sell.uid}`);
-                        sell.comment.push(`Entry split into #${sellCopy.uid} for 30 day rule matching Buy entry #${buy.uid}`);
-
-                        let tmp = this.safeSub(this.safeMult(Math.abs(sell.change), sell.price), this.safeMult(buy.change, buy.price));
-
-                        if (tmp > 0) {
-                          sell.gain = tmp;
-                        } else {
-                          sell.loss = Math.abs(tmp);
-                        }
-
-                        sell.rule = "30 Day BnB";
-                        sell.totalPnl = tmp;
-                        sell.taxable = 1;
-                        sell.matchedUid = buy.uid;
-                        sell.comment.push(`30 day BnB rule, counted against Buy #${buy.uid}`);
-                        
-                        let newPos = Number(j) + 1;
-                        holding.ledger.splice(newPos, 0, sellCopy);
-                        break;
-
-                      } else if (sell.change + buy.change > 0) { 
-                        let buyCopy = JSON.parse(JSON.stringify(buy));
-                        buyCopy.uid = this.getUID();
-
-                        buy.change = -(sell.change); 
-                        buyCopy.change = this.safeSub(buyCopy.change, buy.change); 
-                        sell.counted = 1;
-                        buy.counted = 1;
-                        buy.comment.push(`Entry split into #${buyCopy.uid} for 30 day rule and matched to Sell entry #${sell.uid}`);
-                        sell.comment.push(`30 day BnB rule, counted against Buy #${buy.uid}`);
-
-                        let tmp = this.safeSub(this.safeMult(Math.abs(sell.change), sell.price), this.safeMult(buy.change, buy.price));
-
-                        if (tmp > 0) {
-                          sell.gain = tmp;
-                        } else {
-                          sell.loss = Math.abs(tmp);
-                        }
-
-                        sell.rule = "30 Day BnB";
-                        sell.totalPnl = tmp;
-                        sell.taxable = 1;
-                        sell.matchedUid = buy.uid;
-
-                        let newPos = Number(i) + 1;
-                        holding.ledger.splice(newPos, 0, buyCopy);
-                        break;
-                      }
-                    }
-                  }
-                }
-              }
-            } 
-
-            for (let i in holding.ledger) {
-              let entry = holding.ledger[i];
-              i = Number(i);
-              if (entry.change > 0) { 
-                if (!entry.counted) {
-                  if (i === 0) {
-                    entry.s104Total = entry.change;
-                    entry.s104Price = entry.price;
-                  } else {
-                    entry.s104Total = this.safeAdd(holding.ledger[i - 1].s104Total, entry.change);
-                    let totalCost = this.safeAdd(this.safeMult(holding.ledger[i - 1].s104Total, holding.ledger[i - 1].s104Price), this.safeMult(entry.change, entry.price));
-                    entry.s104Price = this.safeDiv(totalCost, entry.s104Total);
-                  }
-                  entry.comment.push('Added to Section 104 holdings.');
-                } else if (i > 0) {
-                  entry.s104Total = Number(holding.ledger[i - 1].s104Total);
-                  entry.s104Price = Number(holding.ledger[i - 1].s104Price);
-                }
-              } else if (entry.change < 0) {
-                if (!entry.counted) {
-                  if (i === 0) {
-                    console.log(`Error - no history of holdings for disposal #${entry.uid} of ${holding.name}`);
-                    this.errorList.push({
-                      msg: `Error - no history of holdings for disposal #${entry.uid} of ${holding.name}.`,
-                      linkedUid: entry.uid
-                    });
-                  } else if (Number(Math.abs(entry.change).toFixed(2)) > Number((holding.ledger[i - 1].s104Total).toFixed(2))) { 
-                    this.errorList.push({
-                      msg: `Error - Sale exceeds S401 Holdings for disposal ${entry.uid} of ${holding.name}.`,
-                      linkedUid: entry.uid
-                    });
-                  } else {
-                    let tmp = this.safeSub(this.safeMult(Math.abs(entry.change), entry.price), this.safeMult(Math.abs(entry.change), holding.ledger[i - 1].s104Price));
-                    entry.s104Total = this.safeSub(holding.ledger[i - 1].s104Total, Math.abs(entry.change));
-                    if (tmp > 0) {
-                      entry.gain = tmp;
-                    } else {
-                      entry.loss = Math.abs(tmp);
-                    }
-                    entry.rule = "Section 104";
-                    entry.totalPnl = tmp;
-                    entry.taxable = 1;
-                    entry.matchedUid = "Section 104";
-                    entry.s104Price = holding.ledger[i - 1].s104Price;
-                    entry.comment.push(`Gain calculated against Section 104 Holdings`);
-                  }
-                } else if (i > 0) {
-                  entry.s104Total = Number(holding.ledger[i - 1].s104Total);
-                  entry.s104Price = Number(holding.ledger[i - 1].s104Price);
-                }
-              }
-            }
-
-            for (let i in holding.ledger) {
-              let entry = holding.ledger[i];
-              entry.inTaxYear = this.inTaxYear(entry.timestamp);
-
-              if (entry.timestamp > this.taxYear.p30) { 
-                this.taxYear.p30Seen = 1;
-              }
-
-              holding.realisedPl += entry.totalPnl;
-              holding.realisedProfit += entry.gain;
-              holding.realisedLoss += entry.loss;
-
-              if (entry.inTaxYear) {
-                holding.tyData.realisedProfit += entry.gain;
-                holding.tyData.realisedLoss += entry.loss;
-                if (entry.change < 0) {
-                  holding.tyData.disposalCount++;
-                }
-              }
-            }
-
-            this.taxYearData.realisedProfit += holding.tyData.realisedProfit;
-            this.taxYearData.realisedLoss += holding.tyData.realisedLoss;
-            this.taxYearData.disposals += holding.tyData.disposalCount;
-
-            this.realisedPl += Number(holding.realisedPl);
-            this.realisedLoss += Number(holding.realisedLoss);
-            this.realisedProfit += Number(holding.realisedProfit);
-            this.disposalCount += Number(holding.disposalCount);
-          }
-
-          if (!this.taxYear.p30Seen) {
-            console.log(`Caution - No data seen past the end of the tax year +30 days. This period is required for the 30 day BnB calculations if applicable`)
-            this.errorList.push({
-              msg: `Caution - No data seen past the end of the tax year +30 days. This period is required for the 30 day BnB calculations if applicable`,
-              linkedUid: ""
-            });
-          }
+          this.holdings = result.holdings;
+          this.realisedPl = result.aggregates.realisedPl;
+          this.realisedProfit = result.aggregates.realisedProfit;
+          this.realisedLoss = result.aggregates.realisedLoss;
+          this.disposalCount = result.aggregates.disposalCount;
+          this.taxYearData.realisedProfit = result.aggregates.taxYearData.realisedProfit;
+          this.taxYearData.realisedLoss = result.aggregates.taxYearData.realisedLoss;
+          this.taxYearData.disposals = result.aggregates.taxYearData.disposals;
         }
       }
     })
