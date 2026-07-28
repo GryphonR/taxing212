@@ -212,6 +212,42 @@
   }
 
   /**
+   * @brief Check whether the taxpayer was UK resident at a given timestamp.
+   * @param {number} timestamp Epoch milliseconds to test.
+   * @param {Array<{from: number, to: (number|null)}>} nonResidentPeriods Non-UK residence intervals.
+   * @returns {boolean} True when UK resident (not inside a non-resident period).
+   */
+  function isUkResidentAt(timestamp, nonResidentPeriods) {
+    if (!nonResidentPeriods || !nonResidentPeriods.length) {
+      return true;
+    }
+
+    for (let i = 0; i < nonResidentPeriods.length; i++) {
+      const period = nonResidentPeriods[i];
+      const from = Number(period.from);
+      const to = period.to == null || period.to === "" ? Number.POSITIVE_INFINITY : Number(period.to);
+
+      if (!isNaN(from) && timestamp >= from && timestamp <= to) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * @brief Check whether bed-and-breakfast matching applies to a sell/buy pair.
+   * @param {number} sellTimestamp Disposal timestamp.
+   * @param {number} buyTimestamp Re-acquisition timestamp.
+   * @param {Array<{from: number, to: (number|null)}>} nonResidentPeriods Non-UK residence intervals.
+   * @returns {boolean} True when inside the 30-day window and UK resident at re-acquisition.
+   */
+  function isBnbEligible(sellTimestamp, buyTimestamp, nonResidentPeriods) {
+    return isWithinBedAndBreakfastWindow(sellTimestamp, buyTimestamp)
+      && isUkResidentAt(buyTimestamp, nonResidentPeriods);
+  }
+
+  /**
    * @brief Compute same-day disposal gain or loss for a matched lot.
    * @param {number} sellQty Signed sell quantity (negative).
    * @param {number} sellPrice Per-share sell price in GBP.
@@ -267,6 +303,8 @@
     section104Add: section104Add,
     section104Dispose: section104Dispose,
     isWithinBedAndBreakfastWindow: isWithinBedAndBreakfastWindow,
+    isUkResidentAt: isUkResidentAt,
+    isBnbEligible: isBnbEligible,
     sameDayGainLoss: sameDayGainLoss,
     recalculateForeignDividendDetails: recalculateForeignDividendDetails
   };

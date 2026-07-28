@@ -87,7 +87,8 @@
         divUkOthersList: {},
         freeShares: [],
         holdings: {},
-        rtHolder: ""
+        bnbNonResidentPeriods: [],
+        bnbResidenceMode: 'always',
       },
       watch: {
         'taxYear.target': function () {
@@ -111,6 +112,10 @@
           }
           if (localStorage.getItem("corpActions") != null) {
             this.corpActions = JSON.parse(localStorage.getItem("corpActions"));
+          }
+          if (localStorage.getItem("bnbNonResidentPeriods") != null) {
+            this.bnbNonResidentPeriods = JSON.parse(localStorage.getItem("bnbNonResidentPeriods"));
+            this.bnbResidenceMode = this.bnbNonResidentPeriods.length ? 'periods' : 'always';
           }
         });
 
@@ -238,6 +243,44 @@
         removeCorpAction(uid) {
           this.corpActions = this.corpActions.filter(c => c.uid !== uid);
           localStorage.setItem('corpActions', JSON.stringify(this.corpActions));
+        },
+        setBnbResidenceMode(mode) {
+          this.bnbResidenceMode = mode;
+          if (mode === 'always') {
+            this.bnbNonResidentPeriods = [];
+            localStorage.removeItem('bnbNonResidentPeriods');
+          } else if (!this.bnbNonResidentPeriods.length) {
+            this.addBnbNonResidentPeriod();
+          }
+        },
+        addBnbNonResidentPeriod() {
+          this.bnbNonResidentPeriods.push({ uid: 'RES-' + Date.now(), from: '', to: '' });
+          this.persistBnbNonResidentPeriods();
+        },
+        removeBnbNonResidentPeriod(uid) {
+          this.bnbNonResidentPeriods = this.bnbNonResidentPeriods.filter(period => period.uid !== uid);
+          this.persistBnbNonResidentPeriods();
+        },
+        persistBnbNonResidentPeriods() {
+          if (this.bnbResidenceMode === 'always' || !this.bnbNonResidentPeriods.length) {
+            localStorage.removeItem('bnbNonResidentPeriods');
+            return;
+          }
+          localStorage.setItem('bnbNonResidentPeriods', JSON.stringify(this.bnbNonResidentPeriods));
+        },
+        getBnbNonResidentPeriodMillis() {
+          if (this.bnbResidenceMode === 'always') {
+            return [];
+          }
+
+          return this.bnbNonResidentPeriods.map(function (period) {
+            return {
+              from: period.from ? new Date(period.from).getTime() : NaN,
+              to: period.to ? new Date(period.to).getTime() : null
+            };
+          }).filter(function (period) {
+            return !isNaN(period.from);
+          });
         },
         normaliseHeaderName(header) {
           return header == null ? "" : String(header).trim().toLowerCase();
@@ -970,6 +1013,9 @@
             return;
           }
 
+          this.resetCalculations();
+          this.persistBnbNonResidentPeriods();
+
           let allRawTrades = [];
 
           if (localStorage.getItem("rawData") != null) {
@@ -1254,336 +1300,37 @@
           this.holdings = Object.fromEntries(Object.entries(this.holdings).sort(([, a], [, b]) => a.trades[0].timestamp - b.trades[0].timestamp));
         },
         populateLedger() {
-          const ledgerProto = {
-            uid: 0,
-            timestamp: 0,
-            change: 0, 
-            price: 0, 
-            exchangeRate: 0,
-            tradeCount: 0, 
-            tradeIDs: [], 
-            comment: [],
-            counted: 0, 
-            gain: 0,
-            loss: 0,
-            totalPnl: 0,
-            s104Total: 0,
-            s104Price: 0,
-            taxable: 0,
-            matchedUid: "", 
-            rule: "", 
-            inTaxYear: 0, 
-            sdltPaid: 0 
-          }
-
-          for (let key in this.holdings) { 
-            var holding = this.holdings[key]; 
-            for (let tradeKey in holding.trades) { 
-              var t = holding.trades[tradeKey];
-
-              if (!t.inLedger) { 
-                let temp = JSON.parse(JSON.stringify(ledgerProto));
-                temp.uid = this.getUID();
-                temp.timestamp = t.timestamp;
-                temp.change = t.rawType == "Buy" ? t.number : -t.number;
-                temp.price = t.priceGBP;
-                temp.tradeCount = 1;
-                temp.tradeIDs.push(t.uid);
-                holding.ledger.push(temp);
-                t.inLedger = 1; 
-              }
-
-              let ledgerIndex = holding.ledger.length - 1; 
-              let currTradeType = t.rawType;
-
-              for (let i in holding.trades) {
-                let compTrade = holding.trades[i];
-                if (!compTrade.inLedger) { 
-                  if (compTrade.rawType === currTradeType) { 
-                    if (this.sameDay(t.timestamp, compTrade.timestamp)) {
-                      holding.ledger[ledgerIndex].tradeIDs.push(compTrade.uid);
-                      holding.ledger[ledgerIndex].tradeCount++;
-
-                      let newTradeChange = compTrade.rawType == "Buy" ? compTrade.number : -compTrade.number;
-                      holding.ledger[ledgerIndex].change = this.safeAdd(holding.ledger[ledgerIndex].change, newTradeChange);
-                      holding.ledger[ledgerIndex].price = TaxMath.mergeSameDayPrice(
-                        this.safeSub(holding.ledger[ledgerIndex].change, newTradeChange),
-                        holding.ledger[ledgerIndex].price,
-                        newTradeChange,
-                        compTrade.priceGBP
-                      );
-
-                      compTrade.inLedger = 1; 
-                      if (holding.ledger[ledgerIndex].tradeCount > 2) holding.ledger[ledgerIndex].comment.pop();
-                      holding.ledger[ledgerIndex].comment.push(`${holding.ledger[ledgerIndex].tradeCount} trades merged for Same Day Rule.`);
-                    }
-                  }
-                }
-              }
-            }
-          }
+          DisposalEngine.populateLedger(this.holdings, {
+            getUID: () => this.getUID(),
+            sameDay: (ref, test) => this.sameDay(ref, test),
+            safeAdd: (a, b) => this.safeAdd(a, b),
+            safeSub: (a, b) => this.safeSub(a, b),
+            safeMult: (a, b) => this.safeMult(a, b),
+            safeDiv: (a, b) => this.safeDiv(a, b)
+          });
         },
         calculateDisposals() {
-          for (let key in this.holdings) { 
-            var holding = this.holdings[key];
+          const result = DisposalEngine.calculateDisposals(this.holdings, {
+            getUID: () => this.getUID(),
+            sameDay: (ref, test) => this.sameDay(ref, test),
+            inTaxYear: (timestamp) => this.inTaxYear(timestamp),
+            nonResidentPeriods: this.getBnbNonResidentPeriodMillis(),
+            safeAdd: (a, b) => this.safeAdd(a, b),
+            safeSub: (a, b) => this.safeSub(a, b),
+            safeMult: (a, b) => this.safeMult(a, b),
+            safeDiv: (a, b) => this.safeDiv(a, b),
+            errorList: this.errorList,
+            taxYear: this.taxYear
+          });
 
-            for (let i in holding.ledger) {
-              let sell = holding.ledger[i];
-
-              if (sell.change < 0 && !sell.counted) { 
-                for (let j in holding.ledger) {
-                  let buy = holding.ledger[j];
-                  if (this.sameDay(sell.timestamp, buy.timestamp) && buy.change > 0 && !buy.counted) {
-                    if ((sell.change + buy.change) === 0) {
-                      let tmp = this.safeSub(this.safeMult(Math.abs(sell.change), sell.price), this.safeMult(buy.change, buy.price));
-                      if (tmp > 0) {
-                        sell.gain = tmp;
-                      } else {
-                        sell.loss = Math.abs(tmp);
-                      }
-                      sell.comment.push(`Same Day Disposal counted against buy ${buy.uid}`);
-                      sell.rule = "Same Day";
-                      sell.totalPnl = tmp;
-                      sell.taxable = 1;
-                      sell.matchedUid = buy.uid;
-                      sell.counted = 1;
-                      buy.counted = 1;
-                    } else {
-                      if (Math.abs(sell.change) > buy.change) { 
-                        sell.comment.push(`Entry split for sameday rule matching Buy entry #${buy.uid}`);
-                        let sellCopy = JSON.parse(JSON.stringify(sell));
-                        sellCopy.uid = this.getUID();
-                        sell.change = -buy.change;
-                        sellCopy.change = this.safeSub(sellCopy.change, sell.change);
-
-                        holding.ledger.splice(i, 0, sellCopy);
-
-                        let tmp = this.safeSub(this.safeMult(Math.abs(sell.change), sell.price), this.safeMult(buy.change, buy.price));
-                        if (tmp > 0) {
-                          sell.gain = tmp;
-                        } else {
-                          sell.loss = Math.abs(tmp);
-                        }
-
-                        sell.comment.push(`Same Day Disposal counted against buy ${buy.uid}`);
-                        sell.rule = "Same Day";
-                        sell.totalPnl = tmp;
-                        sell.taxable = 1;
-                        sell.matchedUid = buy.uid;
-                        sell.counted = 1;
-                        buy.counted = 1;
-
-                      } else { 
-                        buy.comment.push(`Entry split for sameday rule matching Sell entry #${sell.uid}`);
-                        let buyCopy = JSON.parse(JSON.stringify(buy));
-                        buyCopy.uid = this.getUID();
-                        buy.change = Math.abs(sell.change);
-                        buyCopy.change = this.safeSub(buyCopy.change, buy.change);
-
-                        let tmp = this.safeSub(this.safeMult(Math.abs(sell.change), sell.price), this.safeMult(buy.change, buy.price));
-                        if (tmp > 0) {
-                          sell.gain = tmp;
-                        } else {
-                          sell.loss = Math.abs(tmp);
-                        }
-
-                        sell.comment.push(`Same Day Disposal counted against buy ${buy.uid}`);
-                        sell.rule = "Same Day";
-                        sell.totalPnl = tmp;
-                        sell.taxable = 1;
-                        sell.matchedUid = buy.uid;
-
-                        holding.ledger.splice(j, 0, buyCopy);
-                        sell.counted = 1;
-                        buy.counted = 1;
-                      }
-                    }
-                  }
-                }
-              }
-            }
-
-            for (let i in holding.ledger) {
-              let buy = holding.ledger[i];
-
-              if (buy.change > 0 && !buy.counted) { 
-                for (let j in holding.ledger) {
-                  let sell = holding.ledger[j];
-                  if (sell.change < 0 && !sell.counted) { 
-                    if (TaxMath.isWithinBedAndBreakfastWindow(sell.timestamp, buy.timestamp)) {
-                      if (sell.change + buy.change === 0) { 
-                        sell.counted = 1;
-                        sell.comment.push(`30 day BnB rule, counted against Buy #${buy.uid}`);
-                        buy.counted = 1;
-                        buy.comment.push(`30 day BnB rule, counted against Sell #${sell.uid}`);
-
-                        let tmp = this.safeSub(this.safeMult(Math.abs(sell.change), sell.price), this.safeMult(buy.change, buy.price));
-
-                        if (tmp > 0) {
-                          buy.gain = tmp;
-                        } else {
-                          buy.loss = Math.abs(tmp);
-                        }
-
-                        sell.rule = "30 Day BnB";
-                        sell.totalPnl = tmp;
-                        sell.taxable = 1;
-                        sell.matchedUid = buy.uid;
-
-                      } else if (sell.change + buy.change < 0) { 
-                        let sellCopy = JSON.parse(JSON.stringify(sell));
-                        sellCopy.uid = this.getUID();
-
-                        sell.change = -buy.change;
-                        sellCopy.change = this.safeSub(sellCopy.change, sell.change);
-                        sell.counted = 1;
-                        buy.counted = 1;
-                        buy.comment.push(`30 day BnB rule, counted against Sell #${sell.uid}`);
-                        sell.comment.push(`Entry split into #${sellCopy.uid} for 30 day rule matching Buy entry #${buy.uid}`);
-
-                        let tmp = this.safeSub(this.safeMult(Math.abs(sell.change), sell.price), this.safeMult(buy.change, buy.price));
-
-                        if (tmp > 0) {
-                          sell.gain = tmp;
-                        } else {
-                          sell.loss = Math.abs(tmp);
-                        }
-
-                        sell.rule = "30 Day BnB";
-                        sell.totalPnl = tmp;
-                        sell.taxable = 1;
-                        sell.matchedUid = buy.uid;
-                        sell.comment.push(`30 day BnB rule, counted against Buy #${buy.uid}`);
-                        
-                        let newPos = Number(j) + 1;
-                        holding.ledger.splice(newPos, 0, sellCopy);
-                        break;
-
-                      } else if (sell.change + buy.change > 0) { 
-                        let buyCopy = JSON.parse(JSON.stringify(buy));
-                        buyCopy.uid = this.getUID();
-
-                        buy.change = -(sell.change); 
-                        buyCopy.change = this.safeSub(buyCopy.change, buy.change); 
-                        sell.counted = 1;
-                        buy.counted = 1;
-                        buy.comment.push(`Entry split into #${buyCopy.uid} for 30 day rule and matched to Sell entry #${sell.uid}`);
-                        sell.comment.push(`30 day BnB rule, counted against Buy #${buy.uid}`);
-
-                        let tmp = this.safeSub(this.safeMult(Math.abs(sell.change), sell.price), this.safeMult(buy.change, buy.price));
-
-                        if (tmp > 0) {
-                          sell.gain = tmp;
-                        } else {
-                          sell.loss = Math.abs(tmp);
-                        }
-
-                        sell.rule = "30 Day BnB";
-                        sell.totalPnl = tmp;
-                        sell.taxable = 1;
-                        sell.matchedUid = buy.uid;
-
-                        let newPos = Number(i) + 1;
-                        holding.ledger.splice(newPos, 0, buyCopy);
-                        break;
-                      }
-                    }
-                  }
-                }
-              }
-            } 
-
-            for (let i in holding.ledger) {
-              let entry = holding.ledger[i];
-              i = Number(i);
-              if (entry.change > 0) { 
-                if (!entry.counted) {
-                  if (i === 0) {
-                    entry.s104Total = entry.change;
-                    entry.s104Price = entry.price;
-                  } else {
-                    entry.s104Total = this.safeAdd(holding.ledger[i - 1].s104Total, entry.change);
-                    let totalCost = this.safeAdd(this.safeMult(holding.ledger[i - 1].s104Total, holding.ledger[i - 1].s104Price), this.safeMult(entry.change, entry.price));
-                    entry.s104Price = this.safeDiv(totalCost, entry.s104Total);
-                  }
-                  entry.comment.push('Added to Section 104 holdings.');
-                } else if (i > 0) {
-                  entry.s104Total = Number(holding.ledger[i - 1].s104Total);
-                  entry.s104Price = Number(holding.ledger[i - 1].s104Price);
-                }
-              } else if (entry.change < 0) {
-                if (!entry.counted) {
-                  if (i === 0) {
-                    console.log(`Error - no history of holdings for disposal #${entry.uid} of ${holding.name}`);
-                    this.errorList.push({
-                      msg: `Error - no history of holdings for disposal #${entry.uid} of ${holding.name}.`,
-                      linkedUid: entry.uid
-                    });
-                  } else if (Number(Math.abs(entry.change).toFixed(2)) > Number((holding.ledger[i - 1].s104Total).toFixed(2))) { 
-                    this.errorList.push({
-                      msg: `Error - Sale exceeds S401 Holdings for disposal ${entry.uid} of ${holding.name}.`,
-                      linkedUid: entry.uid
-                    });
-                  } else {
-                    let tmp = this.safeSub(this.safeMult(Math.abs(entry.change), entry.price), this.safeMult(Math.abs(entry.change), holding.ledger[i - 1].s104Price));
-                    entry.s104Total = this.safeSub(holding.ledger[i - 1].s104Total, Math.abs(entry.change));
-                    if (tmp > 0) {
-                      entry.gain = tmp;
-                    } else {
-                      entry.loss = Math.abs(tmp);
-                    }
-                    entry.rule = "Section 104";
-                    entry.totalPnl = tmp;
-                    entry.taxable = 1;
-                    entry.matchedUid = "Section 104";
-                    entry.s104Price = holding.ledger[i - 1].s104Price;
-                    entry.comment.push(`Gain calculated against Section 104 Holdings`);
-                  }
-                } else if (i > 0) {
-                  entry.s104Total = Number(holding.ledger[i - 1].s104Total);
-                  entry.s104Price = Number(holding.ledger[i - 1].s104Price);
-                }
-              }
-            }
-
-            for (let i in holding.ledger) {
-              let entry = holding.ledger[i];
-              entry.inTaxYear = this.inTaxYear(entry.timestamp);
-
-              if (entry.timestamp > this.taxYear.p30) { 
-                this.taxYear.p30Seen = 1;
-              }
-
-              holding.realisedPl += entry.totalPnl;
-              holding.realisedProfit += entry.gain;
-              holding.realisedLoss += entry.loss;
-
-              if (entry.inTaxYear) {
-                holding.tyData.realisedProfit += entry.gain;
-                holding.tyData.realisedLoss += entry.loss;
-                if (entry.change < 0) {
-                  holding.tyData.disposalCount++;
-                }
-              }
-            }
-
-            this.taxYearData.realisedProfit += holding.tyData.realisedProfit;
-            this.taxYearData.realisedLoss += holding.tyData.realisedLoss;
-            this.taxYearData.disposals += holding.tyData.disposalCount;
-
-            this.realisedPl += Number(holding.realisedPl);
-            this.realisedLoss += Number(holding.realisedLoss);
-            this.realisedProfit += Number(holding.realisedProfit);
-            this.disposalCount += Number(holding.disposalCount);
-          }
-
-          if (!this.taxYear.p30Seen) {
-            console.log(`Caution - No data seen past the end of the tax year +30 days. This period is required for the 30 day BnB calculations if applicable`)
-            this.errorList.push({
-              msg: `Caution - No data seen past the end of the tax year +30 days. This period is required for the 30 day BnB calculations if applicable`,
-              linkedUid: ""
-            });
-          }
+          this.holdings = result.holdings;
+          this.realisedPl = result.aggregates.realisedPl;
+          this.realisedProfit = result.aggregates.realisedProfit;
+          this.realisedLoss = result.aggregates.realisedLoss;
+          this.disposalCount = result.aggregates.disposalCount;
+          this.taxYearData.realisedProfit = result.aggregates.taxYearData.realisedProfit;
+          this.taxYearData.realisedLoss = result.aggregates.taxYearData.realisedLoss;
+          this.taxYearData.disposals = result.aggregates.taxYearData.disposals;
         }
       }
     })

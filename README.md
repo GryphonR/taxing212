@@ -9,13 +9,13 @@ It does not tell you how much tax you personally owe - just calculates the figur
 
 ### Capital Gains Calculations
 
-1. Groups multiple purchases or disposals on the same day into single transactions in accorcance with the same day rule.
+1. Groups multiple purchases or disposals on the same day into single transactions in accordance with the same day rule.
 
 2. Identifies same day disposals and calculates gains in accordance with the same day rule.
 
-3. Identifies purchases within 30 days of a disposal of the same asset in accordance with the "bed and breakfast rule".
+3. Identifies purchases within 30 days of a disposal of the same asset in accordance with the "bed and breakfast rule". The rule is skipped when you were not UK tax resident at the time of the re-purchase (HS284).
 
-4. Remaining purchases are appointed to a Section 104 holding, and gains calculated in accordance with .
+4. Remaining purchases are appointed to a Section 104 holding, and gains calculated in accordance with Section 104 pooling rules.
 
 5. Shows trades and fully a commented calculation ledger for each holding.
 
@@ -23,8 +23,13 @@ It does not tell you how much tax you personally owe - just calculates the figur
 
 7. Generates a tax year summary with data required for Self Assessment Tax form.
 
+If a sale exceeds recorded holdings, the app reports a data error. This usually means missing trade history, in-specie transfers, corporate actions, or other gaps — not a missing share-matching rule. Trading 212 does not support short selling, so later-acquisition matching (TCGA92/S105(2)) is not implemented.
+
 ### Dividends
 Splits dividends into UK Companies, UK Other and Non-UK, sums taxes paid on non-UK dividends and provides a tax year summary.
+
+### Testing
+Run `npm test` to execute unit and integration tests for tax year boundaries, fees, share matching, and the disposal engine.
 
 ### Privacy
 All calculations are done locally in your browser, no data is uploaded to a server, no cookies are used and there are no analytics running.

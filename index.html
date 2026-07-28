@@ -14,6 +14,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/decimal.js/10.4.3/decimal.min.js"></script>
   <script src="Scripts/taxMath.js"></script>
+  <script src="Scripts/disposalEngine.js"></script>
 </head>
 
 <body>
@@ -163,6 +164,34 @@
           <div class="button" v-on:click="taxYear.target -= 1">-</div>
           <div class="button" v-on:click="taxYear.target += 1">+</div>
         </div>
+
+        <h4 class="summary-box-subheading" style="margin-top: 25px;">Bed and Breakfast Residence</h4>
+        <p>The 30-day bed and breakfast rule only applies if you were UK tax resident when you re-purchased shares
+          (<a href="https://www.gov.uk/government/publications/shares-and-capital-gains-tax-hs284-self-assessment-helpsheet/hs284-shares-and-capital-gains-tax-2024">HS284</a>).
+        </p>
+        <div class="centre" style="margin-bottom: 10px;">
+          <label style="margin-right: 20px;">
+            <input type="radio" value="always" v-model="bnbResidenceMode" @change="setBnbResidenceMode('always')">
+            UK resident for all trades
+          </label>
+          <label>
+            <input type="radio" value="periods" v-model="bnbResidenceMode" @change="setBnbResidenceMode('periods')">
+            Specify non-resident periods
+          </label>
+        </div>
+        <div v-if="bnbResidenceMode === 'periods'" class="dividend-table" style="grid-template-columns: 1.5fr 1.5fr 80px; align-items: center; max-width: 700px; margin: 0 auto;">
+          <h5 class="ledger-entry">Non-resident from</h5>
+          <h5 class="ledger-entry">Non-resident to (optional)</h5>
+          <h5 class="ledger-entry"></h5>
+          <template v-for="period in bnbNonResidentPeriods">
+            <span class="ledger-entry"><input type="date" v-model="period.from" @change="persistBnbNonResidentPeriods()" style="width: 100%; box-sizing: border-box;"></span>
+            <span class="ledger-entry"><input type="date" v-model="period.to" @change="persistBnbNonResidentPeriods()" style="width: 100%; box-sizing: border-box;"></span>
+            <span class="ledger-entry" style="justify-content: center;"><button class="file-remove-button" @click.prevent="removeBnbNonResidentPeriod(period.uid)">×</button></span>
+          </template>
+          <span class="ledger-entry" style="grid-column: 1 / span 3; justify-content: center;">
+            <div class="button" @click="addBnbNonResidentPeriod" style="margin:0; padding: 5px 10px;">Add Period</div>
+          </span>
+        </div>
       </div>
 
       <div id="step3" class="instruction">
@@ -189,12 +218,14 @@
             href="https://www.gov.uk/hmrc-internal-manuals/capital-gains-manual/cg51560#IDATX33F">same day rule</a>.</p>
         <p>3. Identifies purchases within 30 days of a disposal of the same asset in accordance with the <a
             href="https://www.gov.uk/hmrc-internal-manuals/capital-gains-manual/cg51560#IDATR33F">"bed and breakfast
-            rule"</a>.</p>
+            rule"</a>. This rule is skipped for re-purchases made while you were not UK tax resident.</p>
         <p>4. Remaining purchases are appointed to a Section 104 holding, and gains calculated in accordance with <a
-            href="https://www.gov.uk/hmrc-internal-manuals/capital-gains-manual/cg51575"></a>.</p>
+            href="https://www.gov.uk/hmrc-internal-manuals/capital-gains-manual/cg51575">Section 104 pooling rules</a>.</p>
         <p>5. Shows trades and fully a commented calculation ledger for each holding.</p>
         <p>6. Generates a round trips report for the tax year, noting the tax scheme applied to each round trip.</p>
         <p>7. Generates a tax year summary with data required for Self Assessment Tax form.</p>
+        <p>If a sale exceeds recorded holdings, check for missing trade history, in-specie transfers, corporate actions,
+          or other data gaps before relying on the figures.</p>
         <h4 class="summary-box-subheading">Dividends</h4>
         <p>Splits dividends into UK Companies, UK Other and Non-UK, sums taxes paid on non-UK dividends and provides a
           tax year summary.</p>

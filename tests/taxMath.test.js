@@ -77,10 +77,18 @@ test("same-day merge averages merged sell prices", function () {
 });
 
 test("same-day gain uses proceeds minus matched acquisition cost", function () {
-  const result = TaxMath.sameDayGainLoss(-500, 7, 500, 7, 7);
+  const result = TaxMath.sameDayGainLoss(-500, 7, 500, 7);
   assert.strictEqual(result.totalPnl, 0);
   assert.strictEqual(result.gain, 0);
   assert.strictEqual(result.loss, 0);
+});
+
+test("bed and breakfast requires UK residence at re-acquisition", function () {
+  const sell = ukMillis(2024, 1, 1);
+  const buy = ukMillis(2024, 1, 15);
+
+  assert.ok(TaxMath.isBnbEligible(sell, buy, []));
+  assert.ok(!TaxMath.isBnbEligible(sell, buy, [{ from: buy, to: buy }]));
 });
 
 test("bed and breakfast window is inclusive at day 30", function () {
