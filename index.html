@@ -272,7 +272,7 @@
     </div>
 
     <div v-if="calculated">
-      <h2 class="centre">Calculations for {{fyText}}</h2>
+      <h2 id="results-heading" class="centre">Calculations for {{fyText}}</h2>
       <div class="results-toolbar" v-if="sortedTaxYears.length">
         <label for="resultsTaxYearSelect"><strong>Display results for tax year:</strong></label>
         <select id="resultsTaxYearSelect" class="tax-year-dropdown" v-model.number="taxYear.target">

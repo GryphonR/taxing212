@@ -147,6 +147,43 @@
   }
 
   /**
+   * @brief Return the UK tax year that contains the current date.
+   * @param {number} [now] Optional epoch milliseconds (defaults to Date.now()).
+   * @returns {number} Tax year start year.
+   */
+  function getCurrentTaxYear(now) {
+    return getTaxYearFromTimestamp(now != null ? now : Date.now());
+  }
+
+  /**
+   * @brief Build a continuous ascending list of tax years from earliest data through today.
+   *
+   * Fills in intermediate years so the results-page dropdown matches the unbounded
+   * step-2 picker: users can review any year between their first activity and now.
+   *
+   * @param {number[]} dataYears Tax years found in trade/dividend timestamps.
+   * @param {number} [now] Optional epoch milliseconds for "today" (testing).
+   * @returns {number[]} Ascending tax year start years, or [] when no data years.
+   */
+  function buildTaxYearRange(dataYears, now) {
+    if (!dataYears || dataYears.length === 0) {
+      return [];
+    }
+
+    const minYear = Math.min.apply(null, dataYears);
+    const maxDataYear = Math.max.apply(null, dataYears);
+    const currentTaxYear = getCurrentTaxYear(now);
+    const maxYear = Math.max(maxDataYear, currentTaxYear);
+    const years = [];
+
+    for (let year = minYear; year <= maxYear; year++) {
+      years.push(year);
+    }
+
+    return years;
+  }
+
+  /**
    * @brief Check whether a timestamp falls inside a tax year.
    * @param {number} timestamp Epoch milliseconds.
    * @param {{start: number, end: number}} bounds Tax year bounds.
@@ -362,6 +399,8 @@
     ukCalendarDayStartMillis: ukCalendarDayStartMillis,
     ukCalendarDayEndMillis: ukCalendarDayEndMillis,
     getTaxYearFromTimestamp: getTaxYearFromTimestamp,
+    getCurrentTaxYear: getCurrentTaxYear,
+    buildTaxYearRange: buildTaxYearRange,
     inTaxYear: inTaxYear,
     sameDay: sameDay,
     effectivePricePerShare: effectivePricePerShare,
