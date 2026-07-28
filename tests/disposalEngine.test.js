@@ -198,6 +198,30 @@ test("non-resident re-purchase skips bed and breakfast matching", function () {
   assert.ok(netRealisedPl(nonResidentResult.holdings.RES) > netRealisedPl(residentResult.holdings.RES));
 });
 
+test("non-resident period end date includes re-purchase on last day", function () {
+  const { DateTime } = require("luxon");
+  const endDayNoon = DateTime.fromObject(
+    { year: 2024, month: 3, day: 12, hour: 12, minute: 0 },
+    { zone: TaxMath.UK_ZONE }
+  ).toMillis();
+
+  uidCounter = 1;
+  const holding = makeHolding("EDGE", [
+    makeTrade("Buy", 100, 5, day(1)),
+    makeTrade("Sell", 100, 10, day(10)),
+    makeTrade("Buy", 100, 6, endDayNoon)
+  ]);
+  const result = runEngine({ EDGE: holding }, {
+    nonResidentPeriods: [{
+      from: TaxMath.ukCalendarDayStartMillis("2024-03-10"),
+      to: TaxMath.ukCalendarDayEndMillis("2024-03-12")
+    }]
+  });
+
+  assert.strictEqual(entriesWithRule(result.holdings.EDGE, "30 Day BnB").length, 0);
+  assert.strictEqual(entriesWithRule(result.holdings.EDGE, "Section 104").length, 1);
+});
+
 test("same-day merge averages multiple buy prices on one day", function () {
   uidCounter = 1;
   const holding = makeHolding("MERGE", [

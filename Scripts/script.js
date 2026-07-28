@@ -285,8 +285,8 @@
 
           return this.bnbNonResidentPeriods.map(function (period) {
             return {
-              from: period.from ? new Date(period.from).getTime() : NaN,
-              to: period.to ? new Date(period.to).getTime() : null
+              from: period.from ? TaxMath.ukCalendarDayStartMillis(period.from) : NaN,
+              to: period.to ? TaxMath.ukCalendarDayEndMillis(period.to) : null
             };
           }).filter(function (period) {
             return !isNaN(period.from);

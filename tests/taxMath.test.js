@@ -91,6 +91,26 @@ test("bed and breakfast requires UK residence at re-acquisition", function () {
   assert.ok(!TaxMath.isBnbEligible(sell, buy, [{ from: buy, to: buy }]));
 });
 
+test("non-resident period end date includes full UK calendar day", function () {
+  const period = [{
+    from: TaxMath.ukCalendarDayStartMillis("2024-03-10"),
+    to: TaxMath.ukCalendarDayEndMillis("2024-03-12")
+  }];
+  const noonOnEndDay = ukMillis(2024, 3, 12, 12, 0);
+  const startOfNextDay = ukMillis(2024, 3, 13, 0, 0);
+
+  assert.ok(!TaxMath.isUkResidentAt(noonOnEndDay, period));
+  assert.ok(TaxMath.isUkResidentAt(startOfNextDay, period));
+});
+
+test("calendar date helpers use UK timezone boundaries", function () {
+  const start = TaxMath.ukCalendarDayStartMillis("2024-06-15");
+  const end = TaxMath.ukCalendarDayEndMillis("2024-06-15");
+
+  assert.strictEqual(start, ukMillis(2024, 6, 15, 0, 0));
+  assert.strictEqual(end, ukMillis(2024, 6, 15, 23, 59) + 59999);
+});
+
 test("bed and breakfast window is inclusive at day 30", function () {
   const sell = ukMillis(2024, 1, 1, 12, 0);
   const buyDay30 = ukMillis(2024, 1, 31, 12, 0);

@@ -68,6 +68,70 @@
   }
 
   /**
+   * @brief Parse a YYYY-MM-DD calendar string to UK start-of-day millis.
+   * @param {string} dateString ISO calendar date from an HTML date input.
+   * @returns {number} Epoch milliseconds at 00:00:00.000 UK local time, or NaN when invalid.
+   */
+  function ukCalendarDayStartMillis(dateString) {
+    if (!dateString) {
+      return NaN;
+    }
+
+    const luxon = getLuxon();
+    const parts = String(dateString).split("-");
+    if (parts.length !== 3) {
+      return NaN;
+    }
+
+    const date = luxon.DateTime.fromObject(
+      {
+        year: Number(parts[0]),
+        month: Number(parts[1]),
+        day: Number(parts[2]),
+        hour: 0,
+        minute: 0,
+        second: 0,
+        millisecond: 0
+      },
+      { zone: UK_ZONE }
+    );
+
+    return date.isValid ? date.toMillis() : NaN;
+  }
+
+  /**
+   * @brief Parse a YYYY-MM-DD calendar string to UK end-of-day millis.
+   * @param {string} dateString ISO calendar date from an HTML date input.
+   * @returns {number} Epoch milliseconds at 23:59:59.999 UK local time, or NaN when invalid.
+   */
+  function ukCalendarDayEndMillis(dateString) {
+    if (!dateString) {
+      return NaN;
+    }
+
+    const luxon = getLuxon();
+    const parts = String(dateString).split("-");
+    if (parts.length !== 3) {
+      return NaN;
+    }
+
+    const date = luxon.DateTime.fromObject(
+      {
+        year: Number(parts[0]),
+        month: Number(parts[1]),
+        day: Number(parts[2]),
+        hour: 23,
+        minute: 59,
+        second: 59,
+        millisecond: 999
+      },
+      { zone: UK_ZONE }
+    );
+
+    return date.isValid ? date.toMillis() : NaN;
+  }
+
+  /**
    * @brief Map a timestamp to the UK tax year it falls within.
    * @param {number} timestamp Epoch milliseconds.
    * @returns {number} Tax year start year.
@@ -295,6 +359,8 @@
     MS_PER_DAY: MS_PER_DAY,
     incidentalCosts: incidentalCosts,
     getTaxYearBounds: getTaxYearBounds,
+    ukCalendarDayStartMillis: ukCalendarDayStartMillis,
+    ukCalendarDayEndMillis: ukCalendarDayEndMillis,
     getTaxYearFromTimestamp: getTaxYearFromTimestamp,
     inTaxYear: inTaxYear,
     sameDay: sameDay,
