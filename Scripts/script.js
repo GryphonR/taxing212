@@ -595,7 +595,16 @@
           let taxYears = {};
 
           for (let ticker in this.holdings) {
-            let ledger = this.holdings[ticker].ledger;
+            let holding = this.holdings[ticker];
+            let trades = holding.trades || [];
+            let ledger = holding.ledger || [];
+
+            for (let i = 0; i < trades.length; i++) {
+              if (!isNaN(trades[i].timestamp)) {
+                taxYears[this.getTaxYearFromTimestamp(trades[i].timestamp)] = true;
+              }
+            }
+
             for (let i = 0; i < ledger.length; i++) {
               if (!isNaN(ledger[i].timestamp)) {
                 taxYears[this.getTaxYearFromTimestamp(ledger[i].timestamp)] = true;
@@ -609,11 +618,33 @@
             }
           }
 
-          this.availableTaxYears = Object.keys(taxYears).map(Number).sort(function (a, b) { return a - b; });
+          this.availableTaxYears = TaxMath.buildTaxYearRange(
+            Object.keys(taxYears).map(Number)
+          );
 
-          if (this.availableTaxYears.length && this.availableTaxYears.indexOf(this.taxYear.target) < 0) {
-            this.taxYear.target = this.availableTaxYears[this.availableTaxYears.length - 1];
+          if (this.availableTaxYears.length) {
+            const minYear = this.availableTaxYears[0];
+            const maxYear = this.availableTaxYears[this.availableTaxYears.length - 1];
+
+            if (this.taxYear.target < minYear) {
+              this.taxYear.target = minYear;
+            } else if (this.taxYear.target > maxYear) {
+              this.taxYear.target = maxYear;
+            }
           }
+        },
+        scrollToResultsTop() {
+          if (window.location.hash) {
+            history.replaceState(null, "", window.location.pathname + window.location.search);
+          }
+
+          const resultsHeading = document.getElementById("results-heading");
+          if (resultsHeading) {
+            resultsHeading.scrollIntoView({ behavior: "instant", block: "start" });
+            return;
+          }
+
+          window.scrollTo({ top: 0, behavior: "instant" });
         },
         recalculateTaxYearData() {
           this.setTaxYearBounds(this.taxYear.target);
@@ -1120,7 +1151,10 @@
           t.calculating = 0;
           t.calculated = 1;
 
-          t.$nextTick(() => t.renderCharts());
+          t.$nextTick(() => {
+            t.renderCharts();
+            t.scrollToResultsTop();
+          });
         },
         isInstrumentTrade(trade) {
           const action = this.getTradeValue(trade, "action", 0);

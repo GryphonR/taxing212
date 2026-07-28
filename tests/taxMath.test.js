@@ -170,4 +170,24 @@ test("foreign dividend totals respect selected tax year", function () {
   assert.strictEqual(year2024.taxPaid, 15);
 });
 
+test("getCurrentTaxYear returns the UK tax year containing a timestamp", function () {
+  const mid2025 = ukMillis(2025, 8, 1);
+  const early2026 = ukMillis(2026, 3, 1);
+
+  assert.strictEqual(TaxMath.getCurrentTaxYear(mid2025), 2025);
+  assert.strictEqual(TaxMath.getCurrentTaxYear(early2026), 2025);
+  assert.strictEqual(TaxMath.getCurrentTaxYear(ukMillis(2026, 4, 6)), 2026);
+});
+
+test("buildTaxYearRange fills years from earliest data through current tax year", function () {
+  const now = ukMillis(2026, 7, 28);
+  const range = TaxMath.buildTaxYearRange([2019, 2024], now);
+
+  assert.deepStrictEqual(range, [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026]);
+});
+
+test("buildTaxYearRange returns empty array when no data years", function () {
+  assert.deepStrictEqual(TaxMath.buildTaxYearRange([]), []);
+});
+
 console.log(`\n${passed} tests passed`);
