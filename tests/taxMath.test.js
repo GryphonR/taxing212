@@ -170,6 +170,17 @@ test("foreign dividend totals respect selected tax year", function () {
   assert.strictEqual(year2024.taxPaid, 15);
 });
 
+/**
+ * @brief Reproduce the pre-fix FX bug: net foreign cash mislabelled as GBP tax.
+ * Old code: taxPaidGBP = withholding * ((gross - withholding) / withholding) = net foreign.
+ */
+function buggyForeignTaxAsNetForeign(shares, pricePerShare, withholdingTax) {
+  const gross = shares * pricePerShare;
+  const withholding = withholdingTax;
+  const exRate = (gross - withholding) / withholding;
+  return withholding * exRate;
+}
+
 test("foreignWithholdingTaxGbp uses CSV exchange rate when present", function () {
   // $1.50 withheld at 1.25 USD/GBP → £1.20
   const result = TaxMath.foreignWithholdingTaxGbp(100, 0.1, 1.5, 6.8, 1.25);
@@ -179,20 +190,93 @@ test("foreignWithholdingTaxGbp uses CSV exchange rate when present", function ()
 
 test("foreignWithholdingTaxGbp derives rate from net foreign ÷ Total GBP", function () {
   // Gross $11.47, withhold $1.72 (15%), net $9.75 credited as £7.99
-  // Rate = 9.75 / 7.99; tax GBP = 1.72 / rate ≈ £1.41
   const result = TaxMath.foreignWithholdingTaxGbp(100, 0.1147, 1.72, 7.99, 0);
   const expectedRate = 9.75 / 7.99;
   const expectedTax = 1.72 / expectedRate;
   assert.ok(Math.abs(result.exchangeRate - expectedRate) < 0.0001);
   assert.ok(Math.abs(result.taxPaidGBP - expectedTax) < 0.0001);
-  // Must stay well below the dividend value (old bug produced ~net foreign as "GBP")
-  assert.ok(result.taxPaidGBP < 7.99);
-  assert.ok(result.taxPaidGBP > 1);
 });
 
 test("foreignWithholdingTaxGbp returns zero when no withholding", function () {
   const result = TaxMath.foreignWithholdingTaxGbp(10, 1, 0, 8, 1.2);
   assert.strictEqual(result.taxPaidGBP, 0);
+  assert.strictEqual(result.exchangeRate, 1.2);
+});
+
+test("regression: UWMC-style withholding converts below dividend value", function () {
+  // Mirrors Non-UK Dividends bug: VALUE £7.99 showed TAX PAID £9.75 (net USD as GBP)
+  const shares = 100;
+  const pricePerShare = 0.1147; // gross $11.47
+  const withholding = 1.72; // 15% US withholding
+  const totalGbp = 7.99; // net credited
+
+  const buggyTax = buggyForeignTaxAsNetForeign(shares, pricePerShare, withholding);
+  assert.ok(Math.abs(buggyTax - 9.75) < 0.01, "fixture must reproduce old inflated tax");
+  assert.ok(buggyTax > totalGbp, "old bug produced tax greater than dividend value");
+
+  const result = TaxMath.foreignWithholdingTaxGbp(shares, pricePerShare, withholding, totalGbp, 0);
+  // Correct: withholding / (netForeign / totalGbp) ≈ £1.41
+  assert.ok(Math.abs(result.taxPaidGBP - (1.72 * 7.99 / 9.75)) < 0.0001);
+  assert.ok(result.taxPaidGBP < totalGbp);
+  assert.ok(result.taxPaidGBP < buggyTax);
+});
+
+test("regression: Ecovyst-style withholding stays a fraction of net GBP", function () {
+  // VALUE £83.25 / TAX PAID £94.08 under the old bug (~net USD as GBP)
+  const shares = 500;
+  const pricePerShare = 0.2214; // gross $110.70
+  const withholding = 16.62; // 15%
+  const totalGbp = 83.25;
+  const netForeign = shares * pricePerShare - withholding; // $94.08
+
+  const buggyTax = buggyForeignTaxAsNetForeign(shares, pricePerShare, withholding);
+  assert.ok(Math.abs(buggyTax - 94.08) < 0.01);
+  assert.ok(buggyTax > totalGbp);
+
+  const result = TaxMath.foreignWithholdingTaxGbp(shares, pricePerShare, withholding, totalGbp, 0);
+  const expectedTax = withholding * totalGbp / netForeign; // ≈ £14.69
+  assert.ok(Math.abs(result.taxPaidGBP - expectedTax) < 0.0001);
+  assert.ok(result.taxPaidGBP < totalGbp);
+  // ~15% of gross GBP ≈ withholding/net * totalGbp
+  assert.ok(result.taxPaidGBP / totalGbp < 0.25);
+});
+
+test("regression: blank CSV exchange rate still converts; CSV rate preferred", function () {
+  const shares = 50;
+  const price = 0.2;
+  const withholding = 1.5; // net foreign = 8.5
+  const totalGbp = 6.8;
+
+  const derived = TaxMath.foreignWithholdingTaxGbp(shares, price, withholding, totalGbp, 0);
+  assert.ok(Math.abs(derived.exchangeRate - (8.5 / 6.8)) < 0.0001);
+  assert.ok(Math.abs(derived.taxPaidGBP - (1.5 * 6.8 / 8.5)) < 0.0001);
+
+  const fromCsv = TaxMath.foreignWithholdingTaxGbp(shares, price, withholding, totalGbp, 1.25);
+  assert.strictEqual(fromCsv.exchangeRate, 1.25);
+  assert.ok(Math.abs(fromCsv.taxPaidGBP - 1.2) < 0.0001);
+});
+
+test("regression: foreign tax year totals use converted GBP withholding", function () {
+  const bounds = TaxMath.getTaxYearBounds(2021);
+  const inYear = (timestamp) => TaxMath.inTaxYear(timestamp, bounds);
+
+  // Two UWMC-like rows in 2021-22 plus one outside the year
+  const uwmc = TaxMath.foreignWithholdingTaxGbp(100, 0.1147, 1.72, 7.99, 0);
+  const ecvt = TaxMath.foreignWithholdingTaxGbp(500, 0.2214, 16.62, 83.25, 0);
+  const outside = TaxMath.foreignWithholdingTaxGbp(10, 1, 1.5, 7, 1.2);
+
+  const dividends = [
+    { timestamp: ukMillis(2021, 7, 8), value: 7.99, isUk: 0, taxPaidGBP: uwmc.taxPaidGBP },
+    { timestamp: ukMillis(2021, 8, 24), value: 83.25, isUk: 0, taxPaidGBP: ecvt.taxPaidGBP },
+    { timestamp: ukMillis(2023, 8, 24), value: 7, isUk: 0, taxPaidGBP: outside.taxPaidGBP }
+  ];
+
+  const totals = TaxMath.recalculateForeignDividendDetails(dividends, inYear);
+  assert.ok(Math.abs(totals.nonUk - (7.99 + 83.25)) < 0.0001);
+  assert.ok(Math.abs(totals.taxPaid - (uwmc.taxPaidGBP + ecvt.taxPaidGBP)) < 0.0001);
+  // Aggregated tax must remain far below the inflated net-foreign sum (~103.83)
+  assert.ok(totals.taxPaid < 20);
+  assert.ok(totals.taxPaid < totals.nonUk);
 });
 
 test("getCurrentTaxYear returns the UK tax year containing a timestamp", function () {
