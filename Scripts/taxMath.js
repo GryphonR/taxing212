@@ -391,6 +391,53 @@
     return { nonUk: nonUk, taxPaid: taxPaid };
   }
 
+  /**
+   * @brief Convert foreign dividend withholding tax to GBP.
+   *
+   * Trading 212 stores Exchange rate as foreign currency units per £1
+   * (same convention as trades: GBP = foreign / rate). Dividend rows often
+   * leave Exchange rate blank, so the rate is derived from net foreign cash
+   * ÷ Total (GBP), where Total is the net amount credited after withholding.
+   *
+   * @param {number} shares Number of shares receiving the dividend.
+   * @param {number} pricePerShare Dividend per share in foreign currency.
+   * @param {number} withholdingTax Withholding tax in foreign currency.
+   * @param {number} totalGbp Net dividend credited in GBP (Total column).
+   * @param {number} exchangeRate CSV exchange rate, or 0/blank when absent.
+   * @returns {{taxPaidGBP: number, exchangeRate: number}} Tax in GBP and rate used.
+   */
+  function foreignWithholdingTaxGbp(shares, pricePerShare, withholdingTax, totalGbp, exchangeRate) {
+    const withholding = Math.abs(Number(withholdingTax) || 0);
+    if (withholding <= 0) {
+      return { taxPaidGBP: 0, exchangeRate: Number(exchangeRate) || 0 };
+    }
+
+    // Prefer the CSV rate when present; otherwise reverse it from cash amounts
+    let rate = Number(exchangeRate) || 0;
+    const grossForeign = (Number(shares) || 0) * (Number(pricePerShare) || 0);
+    const netForeign = grossForeign - withholding;
+    const gbp = Math.abs(Number(totalGbp) || 0);
+
+    // Total (GBP) is net cash credited, so net foreign ÷ GBP recovers the FX rate
+    if (rate <= 0 && netForeign > 0 && gbp > 0) {
+      rate = netForeign / gbp;
+    }
+
+    // Fallback if withholding exceeds gross (malformed row): use gross ÷ GBP
+    if (rate <= 0 && grossForeign > 0 && gbp > 0) {
+      rate = grossForeign / gbp;
+    }
+
+    if (rate <= 0) {
+      return { taxPaidGBP: 0, exchangeRate: 0 };
+    }
+
+    return {
+      taxPaidGBP: withholding / rate,
+      exchangeRate: rate
+    };
+  }
+
   const TaxMath = {
     UK_ZONE: UK_ZONE,
     MS_PER_DAY: MS_PER_DAY,
@@ -411,7 +458,8 @@
     isUkResidentAt: isUkResidentAt,
     isBnbEligible: isBnbEligible,
     sameDayGainLoss: sameDayGainLoss,
-    recalculateForeignDividendDetails: recalculateForeignDividendDetails
+    recalculateForeignDividendDetails: recalculateForeignDividendDetails,
+    foreignWithholdingTaxGbp: foreignWithholdingTaxGbp
   };
 
   if (typeof module !== "undefined" && module.exports) {

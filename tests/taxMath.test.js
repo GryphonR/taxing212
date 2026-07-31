@@ -170,6 +170,31 @@ test("foreign dividend totals respect selected tax year", function () {
   assert.strictEqual(year2024.taxPaid, 15);
 });
 
+test("foreignWithholdingTaxGbp uses CSV exchange rate when present", function () {
+  // $1.50 withheld at 1.25 USD/GBP → £1.20
+  const result = TaxMath.foreignWithholdingTaxGbp(100, 0.1, 1.5, 6.8, 1.25);
+  assert.ok(Math.abs(result.taxPaidGBP - 1.2) < 0.0001);
+  assert.strictEqual(result.exchangeRate, 1.25);
+});
+
+test("foreignWithholdingTaxGbp derives rate from net foreign ÷ Total GBP", function () {
+  // Gross $11.47, withhold $1.72 (15%), net $9.75 credited as £7.99
+  // Rate = 9.75 / 7.99; tax GBP = 1.72 / rate ≈ £1.41
+  const result = TaxMath.foreignWithholdingTaxGbp(100, 0.1147, 1.72, 7.99, 0);
+  const expectedRate = 9.75 / 7.99;
+  const expectedTax = 1.72 / expectedRate;
+  assert.ok(Math.abs(result.exchangeRate - expectedRate) < 0.0001);
+  assert.ok(Math.abs(result.taxPaidGBP - expectedTax) < 0.0001);
+  // Must stay well below the dividend value (old bug produced ~net foreign as "GBP")
+  assert.ok(result.taxPaidGBP < 7.99);
+  assert.ok(result.taxPaidGBP > 1);
+});
+
+test("foreignWithholdingTaxGbp returns zero when no withholding", function () {
+  const result = TaxMath.foreignWithholdingTaxGbp(10, 1, 0, 8, 1.2);
+  assert.strictEqual(result.taxPaidGBP, 0);
+});
+
 test("getCurrentTaxYear returns the UK tax year containing a timestamp", function () {
   const mid2025 = ukMillis(2025, 8, 1);
   const early2026 = ukMillis(2026, 3, 1);
