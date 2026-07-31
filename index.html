@@ -3,14 +3,16 @@
 
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Taxing 212</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel='stylesheet' href='Styles/style.css' />
   <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Switched PapaParse to a CDN so it loads correctly in the single-file preview -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/luxon@2.0.2/build/global/luxon.min.js"></script>
-  <!-- Added SheetJS to support generating multi-sheet Excel files -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/decimal.js/10.4.3/decimal.min.js"></script>
   <script src="Scripts/taxMath.js"></script>
@@ -21,170 +23,174 @@
   <div id="app" v-cloak>
     <a class="skip-link" href="#main-content">Skip to main content</a>
     <header class="title-container">
-      <button v-if="calculated" type="button" class="back-button" aria-label="Back to file and tax year selection" v-on:click="back()">
-        &larr; Back
-      </button>
       <h1 class="title">Taxing 212</h1>
-      <p class="subtitle">A UK capital gains tax calculator for Trading 212</p>
+      <p class="subtitle">UK capital gains calculator for Trading 212</p>
     </header>
 
     <div class="page-top-spacer" aria-hidden="true"></div>
 
     <main id="main-content">
-    <div v-if="!calculated" class="workflow-shell">
-      <nav class="stepper" aria-label="Calculation steps">
-        <div class="stepper-item" :class="{active: activeStep === 1}" :aria-current="activeStep === 1 ? 'step' : null">1. Upload</div>
-        <div class="stepper-arrow" aria-hidden="true">→</div>
-        <div class="stepper-item" :class="{active: activeStep === 2}" :aria-current="activeStep === 2 ? 'step' : null">2. Select Year</div>
-        <div class="stepper-arrow" aria-hidden="true">→</div>
-        <div class="stepper-item" :class="{active: activeStep === 3}" :aria-current="activeStep === 3 ? 'step' : null">3. Calculate</div>
-      </nav>
 
-      <div id="step1" class="instruction">
-        <h3 class="summary-box-title">Step 1: Input Data</h3>
-        
-        <div class="results-tabs" role="tablist" aria-label="Input data type" style="margin-top: 0; margin-bottom: 15px;">
-          <button type="button" class="tab-button" role="tab" :aria-selected="activeInputTab === 'csv'" :class="{active: activeInputTab === 'csv'}" @click="activeInputTab = 'csv'">CSV Upload</button>
-          <button type="button" class="tab-button" role="tab" :aria-selected="activeInputTab === 'manual'" :class="{active: activeInputTab === 'manual'}" @click="activeInputTab = 'manual'">Manual Trades</button>
-          <button type="button" class="tab-button" role="tab" :aria-selected="activeInputTab === 'corp'" :class="{active: activeInputTab === 'corp'}" @click="activeInputTab = 'corp'">Corporate Actions</button>
-        </div>
+    <!-- ===== SETUP WORKSPACE ===== -->
+    <div v-if="!calculated" class="workspace">
+      <section class="workspace-panel" aria-labelledby="upload-heading">
+        <h2 id="upload-heading" class="summary-box-title">Trade history</h2>
+        <p>Load your Trading 212 history CSV. Full history is required for Section 104 prices. If split across files, avoid overlaps.</p>
 
-        <div v-show="activeInputTab === 'csv'" role="tabpanel">
-          <p>Load your T212 trade history CSV files. Full history is required to
-            calculate Section 104 Holdings prices. If history is spread across multiple files please ensure there are
-            no overlaps.</p>
-          <div v-if="fileList.length > 0" class="files">
-            <strong>Files Loaded:</strong>
-            <div class="file-list">
-              <div class="file-list-item" v-for="fileName in fileList" :key="fileName">
-                <span>{{fileName}}</span>
-                <button class="file-remove-button" type="button" :aria-label="'Remove file ' + fileName" @click.prevent.stop="removeFile(fileName)">×</button>
-              </div>
+        <div v-if="fileList.length > 0" class="files">
+          <strong>Files loaded</strong>
+          <div class="file-list">
+            <div class="file-list-item" v-for="fileName in fileList" :key="fileName">
+              <span>{{fileName}}</span>
+              <button class="file-remove-button" type="button" :aria-label="'Remove file ' + fileName" @click.prevent.stop="removeFile(fileName)">×</button>
             </div>
           </div>
-          <div class="centre">
-            <input id="fileButton" class="sr-only" type="file" ref="csvFile" accept=".csv,text/csv" multiple @change="addFile" />
-            <button type="button" class="drop-zone" :class="{ 'drop-zone-active': isDraggingFile }" @click="openFilePicker"
-              @dragover.prevent="onDragOver" @dragleave.prevent="onDragLeave" @drop.prevent="onFileDrop"
-              aria-label="Upload Trading 212 CSV files. Drop files here or activate to browse.">
-              <p><strong>Drop CSV files here</strong> or click to browse.</p>
-              <small>Supports Trading 212 history export format.</small>
-            </button>
-          </div>
-          <div v-if="uploadStatus.message" role="status" aria-live="polite" :class="['upload-feedback', uploadStatus.type === 'error' ? 'upload-feedback-error' : 'upload-feedback-success']">
-            {{uploadStatus.message}}
-          </div>
+        </div>
 
-          <div class="button-row">
-            <button type="button" class="button btn-danger" v-on:click="clearFiles()">Clear Files</button>
-          </div>
-          
-          <p class="centre" style="margin-top: 15px;">Note: If you have made changes to a csv file it must be removed and re-added.</p>
+        <div class="centre">
+          <input id="fileButton" class="sr-only" type="file" ref="csvFile" accept=".csv,text/csv" multiple @change="addFile" />
+          <button type="button" class="drop-zone" :class="{ 'drop-zone-active': isDraggingFile }" @click="openFilePicker"
+            @dragover.prevent="onDragOver" @dragleave.prevent="onDragLeave" @drop.prevent="onFileDrop"
+            aria-label="Upload Trading 212 CSV files. Drop files here or activate to browse.">
+            <p><strong>Drop CSV files here</strong> or click to browse.</p>
+            <small>Supports Trading 212 history export format.</small>
+          </button>
+        </div>
+
+        <div v-if="uploadStatus.message" role="status" aria-live="polite" :class="['upload-feedback', uploadStatus.type === 'error' ? 'upload-feedback-error' : 'upload-feedback-success']">
+          {{uploadStatus.message}}
+        </div>
+
+        <div class="button-row" v-if="fileList.length">
+          <button type="button" class="button btn-danger" v-on:click="clearFiles()">Clear Files</button>
+        </div>
+        <p class="centre note-text">Edited CSVs must be removed and re-added.</p>
+      </section>
+
+      <section class="workspace-panel settings-row" aria-labelledby="tax-year-heading">
+        <h2 id="tax-year-heading" class="sr-only">Tax year</h2>
+        <div class="tax-year-inline">
+          <span class="settings-label">Tax year</span>
+          <button type="button" class="button btn-secondary btn-compact" aria-label="Previous tax year" v-on:click="taxYear.target -= 1">−</button>
+          <div class="fy-select" aria-live="polite">{{fyText}}</div>
+          <button type="button" class="button btn-secondary btn-compact" aria-label="Next tax year" v-on:click="taxYear.target += 1">+</button>
+        </div>
+      </section>
+
+      <details class="workspace-panel advanced-panel">
+        <summary>Advanced options</summary>
+        <p class="note-text">Manual trades, corporate actions, and bed-and-breakfast residence — only if you need them.</p>
+
+        <div class="results-tabs input-tabs" role="tablist" aria-label="Advanced input type">
+          <button type="button" class="tab-button" role="tab" :aria-selected="activeInputTab === 'manual'" :class="{active: activeInputTab === 'manual'}" @click="activeInputTab = 'manual'">Manual Trades</button>
+          <button type="button" class="tab-button" role="tab" :aria-selected="activeInputTab === 'corp'" :class="{active: activeInputTab === 'corp'}" @click="activeInputTab = 'corp'">Corporate Actions</button>
+          <button type="button" class="tab-button" role="tab" :aria-selected="activeInputTab === 'bnb'" :class="{active: activeInputTab === 'bnb'}" @click="activeInputTab = 'bnb'">Bed &amp; breakfast</button>
         </div>
 
         <div v-show="activeInputTab === 'manual'" role="tabpanel">
-          <p>Add manual trades here to account for in-specie transfers from other brokers.</p>
-          <div class="dividend-table" style="grid-template-columns: 1.5fr 1fr 1fr 1.5fr 1fr 1fr 80px; align-items: center;">
-            <label class="ledger-entry form-grid-header" for="manual-trade-date">Date/Time</label>
-            <label class="ledger-entry form-grid-header" for="manual-trade-action">Action</label>
-            <label class="ledger-entry form-grid-header" for="manual-trade-ticker">Ticker</label>
-            <label class="ledger-entry form-grid-header" for="manual-trade-name">Name</label>
-            <label class="ledger-entry form-grid-header" for="manual-trade-shares">Shares</label>
-            <label class="ledger-entry form-grid-header" for="manual-trade-price">Price (£)</label>
-            <span class="ledger-entry"><span class="sr-only">Remove trade</span></span>
+          <p class="panel-lead">Use this for in-specie transfers from other brokers that are missing from your CSV.</p>
 
-            <template v-for="mt in manualTrades">
-              <span class="ledger-entry">{{mt.date.replace('T', ' ')}}</span>
-              <span class="ledger-entry">{{mt.action}}</span>
-              <span class="ledger-entry">{{mt.ticker}}</span>
-              <span class="ledger-entry">{{mt.name}}</span>
-              <span class="ledger-entry">{{mt.shares}}</span>
-              <span class="ledger-entry">£{{mt.price}}</span>
-              <span class="ledger-entry" style="justify-content: center;"><button type="button" class="file-remove-button" :aria-label="'Remove manual trade ' + mt.ticker" @click.prevent="removeManualTrade(mt.uid)">×</button></span>
-            </template>
+          <div v-if="manualTrades.length" class="advanced-list" aria-label="Saved manual trades">
+            <div class="advanced-list-item" v-for="mt in manualTrades" :key="mt.uid">
+              <div class="advanced-list-body">
+                <strong>{{mt.action}} {{mt.ticker}}</strong>
+                <span class="advanced-list-meta">{{mt.date.replace('T', ' ')}} · {{mt.shares}} @ £{{mt.price}}<span v-if="mt.name"> · {{mt.name}}</span></span>
+              </div>
+              <button type="button" class="file-remove-button" :aria-label="'Remove manual trade ' + mt.ticker" @click.prevent="removeManualTrade(mt.uid)">×</button>
+            </div>
+          </div>
 
-            <span class="ledger-entry"><input id="manual-trade-date" type="datetime-local" class="form-grid-input" v-model="manualTradeForm.date"></span>
-            <span class="ledger-entry">
+          <div class="advanced-form">
+            <div class="form-field">
+              <label for="manual-trade-date">Date / time</label>
+              <input id="manual-trade-date" type="datetime-local" class="form-grid-input" v-model="manualTradeForm.date">
+            </div>
+            <div class="form-field">
+              <label for="manual-trade-action">Action</label>
               <select id="manual-trade-action" class="form-grid-input" v-model="manualTradeForm.action">
                 <option>Buy</option>
                 <option>Sell</option>
               </select>
-            </span>
-            <span class="ledger-entry"><input id="manual-trade-ticker" type="text" list="portfolio-tickers" placeholder="Ticker" class="form-grid-input" v-model="manualTradeForm.ticker" @change="autoFillManualName"></span>
-            <span class="ledger-entry"><input id="manual-trade-name" type="text" placeholder="Name (opt)" class="form-grid-input" v-model="manualTradeForm.name"></span>
-            <span class="ledger-entry"><input id="manual-trade-shares" type="number" step="0.00000001" placeholder="Shares" class="form-grid-input" v-model.number="manualTradeForm.shares"></span>
-            <span class="ledger-entry"><input id="manual-trade-price" type="number" step="0.01" placeholder="Price" class="form-grid-input" v-model.number="manualTradeForm.price"></span>
-            <span class="ledger-entry" style="justify-content: center;"><button type="button" class="button btn-secondary btn-compact" :disabled="!isManualTradeValid" @click="addManualTrade">Add</button></span>
-          </div>
-        </div>
-
-        <div v-show="activeInputTab === 'corp'" role="tabpanel">
-          <p>Map corporate actions (like Stock Splits or Mergers). The app will retrospectively apply these to your ledger.</p>
-          <div class="dividend-table" style="grid-template-columns: 1fr 1.5fr 1fr 1.5fr 2fr 80px; align-items: center;">
-            <label class="ledger-entry form-grid-header" for="corp-action-type">Type</label>
-            <label class="ledger-entry form-grid-header" for="corp-action-date">Effective Date</label>
-            <label class="ledger-entry form-grid-header" for="corp-action-ticker">Ticker</label>
-            <span class="ledger-entry form-grid-header">Action/Ratio</span>
-            <span class="ledger-entry form-grid-header">New Ticker/Name</span>
-            <span class="ledger-entry"><span class="sr-only">Remove corporate action</span></span>
-
-            <template v-for="ca in corpActions">
-              <span class="ledger-entry">{{ca.type}}</span>
-              <span class="ledger-entry">{{ca.date}}</span>
-              <span class="ledger-entry">{{ca.ticker}}</span>
-              <span class="ledger-entry">{{ca.type === 'Split' ? ca.ratio + ' for 1' : '-'}}</span>
-              <span class="ledger-entry">{{ca.type === 'Rename' ? ca.newTicker + ' (' + ca.newName + ')' : '-'}}</span>
-              <span class="ledger-entry" style="justify-content: center;"><button type="button" class="file-remove-button" :aria-label="'Remove corporate action for ' + ca.ticker" @click.prevent="removeCorpAction(ca.uid)">×</button></span>
-            </template>
-
-            <span class="ledger-entry">
-              <select id="corp-action-type" class="form-grid-input" v-model="corpActionForm.type">
-                <option>Split</option>
-                <option>Rename</option>
-              </select>
-            </span>
-            <span class="ledger-entry"><input id="corp-action-date" type="date" class="form-grid-input" v-model="corpActionForm.date"></span>
-            <span class="ledger-entry"><input id="corp-action-ticker" type="text" list="portfolio-tickers" placeholder="Ticker" class="form-grid-input" v-model="corpActionForm.ticker"></span>
-            <span class="ledger-entry">
-              <template v-if="corpActionForm.type === 'Split'">
-                <label class="sr-only" for="corp-action-ratio">Split ratio (e.g. 4 for a 4-for-1 split)</label>
-                <input id="corp-action-ratio" type="number" step="0.01" placeholder="Ratio (e.g. 4)" class="form-grid-input" v-model.number="corpActionForm.ratio">
-              </template>
-              <span v-else>-</span>
-            </span>
-            <span class="ledger-entry">
-              <div v-if="corpActionForm.type === 'Rename'" style="display: flex; gap: 5px; width: 100%;">
-                <label class="sr-only" for="corp-action-new-ticker">New ticker after rename</label>
-                <input id="corp-action-new-ticker" type="text" placeholder="New Ticker" class="form-grid-input" v-model="corpActionForm.newTicker" style="width: 50%;">
-                <label class="sr-only" for="corp-action-new-name">New name after rename</label>
-                <input id="corp-action-new-name" type="text" placeholder="New Name" class="form-grid-input" v-model="corpActionForm.newName" style="width: 50%;">
-              </div>
-              <span v-else>-</span>
-            </span>
-            <span class="ledger-entry" style="justify-content: center;"><button type="button" class="button btn-secondary btn-compact" :disabled="!isCorpActionValid" @click="addCorpAction">Add</button></span>
-          </div>
-        </div>
-      </div>
-
-      <div id="step2" class="instruction">
-        <h3 class="summary-box-title">Step 2: Select Tax Year</h3>
-
-        <div class="sub-section">
-          <h4 class="summary-box-subheading">Tax year</h4>
-          <p>Select the target tax year for calculations.</p>
-          <div class="centre">
-            <div class="fy-select" aria-live="polite">{{fyText}}</div>
-            <div class="button-row">
-              <button type="button" class="button btn-secondary btn-compact" aria-label="Previous tax year" v-on:click="taxYear.target -= 1">−</button>
-              <button type="button" class="button btn-secondary btn-compact" aria-label="Next tax year" v-on:click="taxYear.target += 1">+</button>
+            </div>
+            <div class="form-field">
+              <label for="manual-trade-ticker">Ticker</label>
+              <input id="manual-trade-ticker" type="text" list="portfolio-tickers" placeholder="e.g. VOD" class="form-grid-input" v-model="manualTradeForm.ticker" @change="autoFillManualName">
+            </div>
+            <div class="form-field">
+              <label for="manual-trade-name">Name <span class="optional">(optional)</span></label>
+              <input id="manual-trade-name" type="text" placeholder="Company name" class="form-grid-input" v-model="manualTradeForm.name">
+            </div>
+            <div class="form-field">
+              <label for="manual-trade-shares">Shares</label>
+              <input id="manual-trade-shares" type="number" step="0.00000001" placeholder="0" class="form-grid-input" v-model.number="manualTradeForm.shares">
+            </div>
+            <div class="form-field">
+              <label for="manual-trade-price">Price (£)</label>
+              <input id="manual-trade-price" type="number" step="0.01" placeholder="0.00" class="form-grid-input" v-model.number="manualTradeForm.price">
+            </div>
+            <div class="form-field form-field-action">
+              <button type="button" class="button btn-secondary btn-compact" :disabled="!isManualTradeValid" @click="addManualTrade">Add trade</button>
             </div>
           </div>
         </div>
 
-        <div class="sub-section">
-          <h4 class="summary-box-subheading">Bed and breakfast residence</h4>
-          <p>The 30-day bed and breakfast rule only applies if you were UK tax resident when you re-purchased shares
-            (<a href="https://www.gov.uk/government/publications/shares-and-capital-gains-tax-hs284-self-assessment-helpsheet/hs284-shares-and-capital-gains-tax-2024">HS284</a>).
+        <div v-show="activeInputTab === 'corp'" role="tabpanel">
+          <p class="panel-lead">Record stock splits or ticker renames so older trades are adjusted before matching.</p>
+
+          <div v-if="corpActions.length" class="advanced-list" aria-label="Saved corporate actions">
+            <div class="advanced-list-item" v-for="ca in corpActions" :key="ca.uid">
+              <div class="advanced-list-body">
+                <strong>{{ca.type}} · {{ca.ticker}}</strong>
+                <span class="advanced-list-meta">
+                  {{ca.date}}
+                  <template v-if="ca.type === 'Split'"> · {{ca.ratio}} for 1</template>
+                  <template v-if="ca.type === 'Rename'"> · {{ca.newTicker}} ({{ca.newName}})</template>
+                </span>
+              </div>
+              <button type="button" class="file-remove-button" :aria-label="'Remove corporate action for ' + ca.ticker" @click.prevent="removeCorpAction(ca.uid)">×</button>
+            </div>
+          </div>
+
+          <div class="advanced-form">
+            <div class="form-field">
+              <label for="corp-action-type">Type</label>
+              <select id="corp-action-type" class="form-grid-input" v-model="corpActionForm.type">
+                <option>Split</option>
+                <option>Rename</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="corp-action-date">Effective date</label>
+              <input id="corp-action-date" type="date" class="form-grid-input" v-model="corpActionForm.date">
+            </div>
+            <div class="form-field">
+              <label for="corp-action-ticker">Ticker</label>
+              <input id="corp-action-ticker" type="text" list="portfolio-tickers" placeholder="e.g. TSLA" class="form-grid-input" v-model="corpActionForm.ticker">
+            </div>
+            <div class="form-field" v-if="corpActionForm.type === 'Split'">
+              <label for="corp-action-ratio">Split ratio</label>
+              <input id="corp-action-ratio" type="number" step="0.01" placeholder="e.g. 4 for a 4-for-1" class="form-grid-input" v-model.number="corpActionForm.ratio">
+            </div>
+            <template v-if="corpActionForm.type === 'Rename'">
+              <div class="form-field">
+                <label for="corp-action-new-ticker">New ticker</label>
+                <input id="corp-action-new-ticker" type="text" placeholder="New ticker" class="form-grid-input" v-model="corpActionForm.newTicker">
+              </div>
+              <div class="form-field">
+                <label for="corp-action-new-name">New name</label>
+                <input id="corp-action-new-name" type="text" placeholder="New name" class="form-grid-input" v-model="corpActionForm.newName">
+              </div>
+            </template>
+            <div class="form-field form-field-action">
+              <button type="button" class="button btn-secondary btn-compact" :disabled="!isCorpActionValid" @click="addCorpAction">Add action</button>
+            </div>
+          </div>
+        </div>
+
+        <div v-show="activeInputTab === 'bnb'" role="tabpanel">
+          <p class="panel-lead">
+            The 30-day bed and breakfast rule only applies if you were UK tax resident when you re-purchased
+            <a href="https://www.gov.uk/government/publications/shares-and-capital-gains-tax-hs284-self-assessment-helpsheet/hs284-shares-and-capital-gains-tax-2024">HS284</a>.
           </p>
           <fieldset class="radio-group">
             <legend class="sr-only">UK tax residence for bed and breakfast rule</legend>
@@ -197,244 +203,194 @@
               Specify non-resident periods
             </label>
           </fieldset>
-          <div v-if="bnbResidenceMode === 'periods'" class="dividend-table" style="grid-template-columns: 1.5fr 1.5fr 80px; align-items: center; max-width: 700px; margin: 0 auto;">
-            <h5 class="ledger-entry" id="bnb-from-header">Non-resident from</h5>
-            <h5 class="ledger-entry" id="bnb-to-header">Non-resident to (optional)</h5>
-            <h5 class="ledger-entry"><span class="sr-only">Remove period</span></h5>
-            <template v-for="period in bnbNonResidentPeriods">
-              <span class="ledger-entry"><input type="date" class="form-grid-input" v-model="period.from" @change="persistBnbNonResidentPeriods()" aria-labelledby="bnb-from-header"></span>
-              <span class="ledger-entry"><input type="date" class="form-grid-input" v-model="period.to" @change="persistBnbNonResidentPeriods()" aria-labelledby="bnb-to-header"></span>
-              <span class="ledger-entry" style="justify-content: center;"><button type="button" class="file-remove-button" aria-label="Remove non-resident period" @click.prevent="removeBnbNonResidentPeriod(period.uid)">×</button></span>
-            </template>
-            <span class="ledger-entry" style="grid-column: 1 / span 3; justify-content: center;">
-              <button type="button" class="button btn-secondary btn-compact" @click="addBnbNonResidentPeriod">Add Period</button>
-            </span>
+
+          <div v-if="bnbResidenceMode === 'periods'">
+            <div v-if="bnbNonResidentPeriods.length" class="advanced-list" aria-label="Non-resident periods">
+              <div class="advanced-list-item" v-for="period in bnbNonResidentPeriods" :key="period.uid">
+                <div class="advanced-form advanced-form-inline">
+                  <div class="form-field">
+                    <label :for="'bnb-from-' + period.uid">From</label>
+                    <input :id="'bnb-from-' + period.uid" type="date" class="form-grid-input" v-model="period.from" @change="persistBnbNonResidentPeriods()">
+                  </div>
+                  <div class="form-field">
+                    <label :for="'bnb-to-' + period.uid">To <span class="optional">(optional)</span></label>
+                    <input :id="'bnb-to-' + period.uid" type="date" class="form-grid-input" v-model="period.to" @change="persistBnbNonResidentPeriods()">
+                  </div>
+                </div>
+                <button type="button" class="file-remove-button" aria-label="Remove non-resident period" @click.prevent="removeBnbNonResidentPeriod(period.uid)">×</button>
+              </div>
+            </div>
+            <div class="form-field form-field-action">
+              <button type="button" class="button btn-secondary btn-compact" @click="addBnbNonResidentPeriod">Add period</button>
+            </div>
           </div>
         </div>
-      </div>
+      </details>
 
-      <div id="step3" class="instruction">
-        <h3 class="summary-box-title">Step 3: Calculate</h3>
-        <div class="centre">
-          <div class="disclaimer-checkbox">
-            <input id="acceptDisclaimer" type="checkbox" v-model="acceptedDisclaimer">
-            <label for="acceptDisclaimer">I have read and accept the <a href="#disclaimer">disclaimer</a></label>
-          </div>
-          <p v-if="disclaimerError" class="field-error" role="alert">Please accept the disclaimer before calculating.</p>
-          <p v-if="calculateError" class="field-error" role="alert">{{calculateError}}</p>
-          <button type="button" class="button btn-primary" :disabled="!acceptedDisclaimer" v-on:click="calculate()">Calculate</button>
-        </div>
-      </div>
-
-      <!-- Datalist containing all unique tickers from the uploaded CSVs for dropdown selection -->
       <datalist id="portfolio-tickers">
         <option v-for="t in availableTickers" :value="t.ticker">{{t.name}}</option>
       </datalist>
 
-      <details class="instruction collapsible-section">
+      <div class="workspace-action-bar">
+        <div class="disclaimer-checkbox">
+          <input id="acceptDisclaimer" type="checkbox" v-model="acceptedDisclaimer">
+          <label for="acceptDisclaimer">I have read and accept the <a href="#disclaimer">disclaimer</a></label>
+        </div>
+        <p v-if="disclaimerError" class="field-error" role="alert">Please accept the disclaimer before calculating.</p>
+        <p v-if="calculateError" class="field-error" role="alert">{{calculateError}}</p>
+        <button type="button" class="button btn-primary" :disabled="!acceptedDisclaimer" v-on:click="calculate()">Calculate</button>
+      </div>
+
+      <details class="collapsible-section help-panel">
         <summary>How it works, privacy, and disclaimer</summary>
+
         <h3 class="summary-box-title">How it works</h3>
-        Reads in account history CSV files in the format provided by Trading 212 and provides data useful for filling in
-        a self assessment tax return.
-        <h4 class="summary-box-subheading">Capital Gains Calculations</h4>
-        <p>1. Groups multiple purchases or disposals on the same day into single transactions in accordance with the <a
-            href="https://www.gov.uk/hmrc-internal-manuals/capital-gains-manual/cg51560#IDATX33F">same day rule</a>.</p>
-        <p>2. Identifies same day disposals and calculates gains in accordance with the <a
-            href="https://www.gov.uk/hmrc-internal-manuals/capital-gains-manual/cg51560#IDATX33F">same day rule</a>.</p>
-        <p>3. Identifies purchases within 30 days of a disposal of the same asset in accordance with the <a
-            href="https://www.gov.uk/hmrc-internal-manuals/capital-gains-manual/cg51560#IDATR33F">"bed and breakfast
-            rule"</a>. This rule is skipped for re-purchases made while you were not UK tax resident.</p>
-        <p>4. Remaining purchases are appointed to a Section 104 holding, and gains calculated in accordance with <a
-            href="https://www.gov.uk/hmrc-internal-manuals/capital-gains-manual/cg51575">Section 104 pooling rules</a>.</p>
-        <p>5. Shows trades and fully a commented calculation ledger for each holding.</p>
-        <p>6. Generates a round trips report for the tax year, noting the tax scheme applied to each round trip.</p>
-        <p>7. Generates a tax year summary with data required for Self Assessment Tax form.</p>
-        <p>If a sale exceeds recorded holdings, check for missing trade history, in-specie transfers, corporate actions,
-          or other data gaps before relying on the figures.</p>
+        <p>Taxing 212 reads Trading 212 history CSV files in your browser and produces figures useful for a UK Self Assessment return. It does not calculate how much tax you personally owe.</p>
+
+        <h4 class="summary-box-subheading">Capital gains</h4>
+        <ol class="help-list">
+          <li>Same-day buys and sells are grouped into single transactions under the <a href="https://www.gov.uk/hmrc-internal-manuals/capital-gains-manual/cg51560#IDATX33F">same day rule</a>.</li>
+          <li>Same-day disposals are matched and gains calculated under that rule.</li>
+          <li>Buys within 30 days of a disposal are matched under the <a href="https://www.gov.uk/hmrc-internal-manuals/capital-gains-manual/cg51560#IDATR33F">bed and breakfast rule</a>, unless you were not UK tax resident at repurchase.</li>
+          <li>Remaining shares go into a Section 104 pool and are disposed using <a href="https://www.gov.uk/hmrc-internal-manuals/capital-gains-manual/cg51575">pooling rules</a>.</li>
+          <li>Each holding gets a trade log and a commented calculation ledger.</li>
+          <li>A round-trips report shows which matching rule applied to each disposal in the tax year.</li>
+          <li>A tax-year summary lists the figures typically needed for Self Assessment.</li>
+        </ol>
+        <p>If a sale exceeds recorded holdings, check for missing history, in-specie transfers, corporate actions, or other data gaps before relying on the figures.</p>
+
         <h4 class="summary-box-subheading">Dividends</h4>
-        <p>Splits dividends into UK Companies, UK Other and Non-UK, sums taxes paid on non-UK dividends and provides a
-          tax year summary.</p>
+        <p>Dividends are split into UK companies, other UK (funds/trusts), and non-UK. Foreign withholding tax is totalled for the selected tax year.</p>
+
         <h4 class="summary-box-subheading">Privacy</h4>
-        <p>All calculations are done locally in your browser, no data is uploaded to a server, no cookies are used and
-          there are no analytics running.</p>
-        <p>All code is open source on <a href="https://github.com/GryphonR/taxing212">github</a> for verifying the above statement.</p>
+        <p>Everything runs locally in your browser. No data is uploaded, no cookies are set, and there is no analytics. The code is open source on <a href="https://github.com/GryphonR/taxing212">GitHub</a>.</p>
+
         <h4 id="disclaimer" class="summary-box-subheading">Disclaimer</h4>
-        <p>These calculations may only be used for tax purposes after they have been checked for accuracy and
-          completeness by yourself or your tax advisor.</p>
-        <p>THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-          IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-          FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-          AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-          LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-          OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-          SOFTWARE.</p>
+        <p>Use these figures for tax purposes only after you or your tax advisor have checked them for accuracy and completeness.</p>
+        <p class="help-legal">This software is provided “as is”, without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose and noninfringement. In no event shall the authors or copyright holders be liable for any claim, damages or other liability, whether in an action of contract, tort or otherwise, arising from, out of or in connection with the software or the use or other dealings in the software.</p>
       </details>
     </div>
 
-    <div v-if="calculated">
-      <h2 id="results-heading" class="centre">Calculations for {{fyText}}</h2>
-      <div class="results-toolbar" v-if="sortedTaxYears.length">
-        <label for="resultsTaxYearSelect"><strong>Display results for tax year:</strong></label>
-        <select id="resultsTaxYearSelect" class="tax-year-dropdown" v-model.number="taxYear.target">
-          <option v-for="year in sortedTaxYears" :value="year">{{String(year).slice(-2)}}-{{String(year + 1).slice(-2)}}FY</option>
-        </select>
-        <button type="button" class="button btn-primary" v-on:click="downloadFullSummary()">Download Full Summary</button>
-      </div>
-      <p v-if="exportError" class="field-error centre" role="alert">{{exportError}}</p>
-
-      <p class="disclaimer-banner centre">These calculations may be used for tax purposes after they have been checked for accuracy and completeness by yourself or your tax advisor.</p>
-
-      <div class="error-container" v-if="errorList.length > 0" role="alert" aria-live="assertive">
-        <h2 class="summary-box-title">Errors Detected</h2>
-        <p>Errors were found during calculations - normally caused by missing data, stock splits or ticker changes
-          (i.e. SPACs). Fix or understand these before
-          proceeding.</p>
-        <p>It is best to change the raw CSV data for the purchase event in to match the disposal event data, then go
-          back, clear and re-load CSV files.</p>
-        <template v-for="error in errorList">
-          <div class="error">
-            <span class="sr-only" v-if="error.msg.includes('Error')">Error:</span>
-            <span class="sr-only" v-else-if="error.msg.includes('Caution')">Caution:</span>
-            <span v-if="error.msg.includes('Error')" aria-hidden="true">🔴</span>
-            <span v-else-if="error.msg.includes('Caution')" aria-hidden="true">⚠️</span>
-            {{error.msg}}
-            <span v-if="Number(error.linkedUid)">(Go to: <a href="#" @click.prevent="goToError(error.linkedUid)">{{error.linkedUid}}</a>)</span>
-          </div>
-        </template>
-      </div>
-
-      <div class="summary-master-container">
-        <div class="summary-container g2">
-          <h2 class="summary-box-title" style="grid-column: 1 / span 2;"> Tax Year {{fyText}} Summary </h2>
-          <div class="summary-item c1">
-            Disposal Count:
-          </div>
-          <div class="summary-item c2">
-            {{taxYearData.disposals}}
-          </div>
-          <div class="summary-item c1">
-            Disposal Proceeds:
-          </div>
-          <div class="summary-item c2">
-            {{formatCurrency(taxYearData.proceeds)}}
-          </div>
-          <div class="summary-item c1">
-            Total acquisition costs:
-          </div>
-          <div class="summary-item c2">
-            {{formatCurrency(taxYearData.costs)}}
-          </div>
-          <div class="summary-item c1">
-            Total Realised Profit:
-          </div>
-          <div class="summary-item c2">
-            <span class="currency-positive">{{formatCurrency(taxYearData.realisedProfit)}}</span>
-          </div>
-          <div class="summary-item c1">
-            Total Realised Loss:
-          </div>
-          <div class="summary-item c2">
-            <span class="currency-negative">{{formatCurrency(taxYearData.realisedLoss)}}</span>
-          </div>
-          <div class="summary-item c1">
-            Combined P/L:
-          </div>
-          <div class="summary-item c2">
-            <span :class="currencyClass(taxYearData.realisedProfit - taxYearData.realisedLoss)">{{formatCurrency(taxYearData.realisedProfit - taxYearData.realisedLoss)}}</span>
-          </div>
-          <div class="summary-item c1">
-            Dividends Received:
-          </div>
-          <div class="summary-item c2">
-            {{formatCurrency(taxYearData.dividends)}}
-          </div>
+    <!-- ===== RESULTS REPORT ===== -->
+    <div v-if="calculated" class="results-view">
+      <header class="report-header">
+        <h2 id="results-heading" class="results-heading">Calculations for {{fyText}}</h2>
+        <div class="results-toolbar">
+          <label for="resultsTaxYearSelect" v-if="sortedTaxYears.length">Tax year</label>
+          <select id="resultsTaxYearSelect" class="tax-year-dropdown" v-if="sortedTaxYears.length" v-model.number="taxYear.target">
+            <option v-for="year in sortedTaxYears" :value="year">{{String(year).slice(-2)}}-{{String(year + 1).slice(-2)}}FY</option>
+          </select>
+          <button type="button" class="button btn-primary" v-on:click="downloadFullSummary()">Download Full Summary</button>
+          <button type="button" class="button btn-secondary" v-on:click="back()">Edit inputs</button>
         </div>
+        <p v-if="exportError" class="field-error" role="alert">{{exportError}}</p>
+        <p class="disclaimer-banner">These calculations may be used for tax purposes after they have been checked for accuracy and completeness by yourself or your tax advisor.</p>
+      </header>
 
-        <div class="summary-container g2">
-          <h2 class="summary-box-title" style="grid-column: 1 / span 2;"> All Data Summary: </h2>
-          <div class="summary-item c1">
-            Disposal Count:
-          </div>
-          <div class="summary-item c2">
-            {{disposalCount}}
-          </div>
-          <div class="summary-item c1">
-            Total Realised Profit:
-          </div>
-          <div class="summary-item c2">
-            <span class="currency-positive">{{formatCurrency(realisedProfit)}}</span>
-          </div>
-          <div class="summary-item c1">
-            Total Realised Loss:
-          </div>
-          <div class="summary-item c2">
-            <span class="currency-negative">{{formatCurrency(realisedLoss)}}</span>
-          </div>
-          <div class="summary-item c1">
-            Combined P/L:
-          </div>
-          <div class="summary-item c2">
-            <span :class="currencyClass(realisedProfit - realisedLoss)">{{formatCurrency(realisedProfit - realisedLoss)}}</span>
-          </div>
-          <div class="summary-item c1">
-            Unrealised Capital Gain (open positions):
-          </div>
-          <div class="summary-item c2">
-            <span :class="currencyClass(totalUnrealisedGain())">{{formatCurrency(totalUnrealisedGain())}}</span>
-          </div>
-          <div class="summary-item c1">
-            Dividends Received:
-          </div>
-          <div class="summary-item c2">
-            {{formatCurrency(dividendsTotal)}}
-          </div>
-        </div>
+      <nav class="results-nav" role="tablist" aria-label="Results sections">
+        <button type="button" class="results-nav-item" role="tab" :aria-selected="activeResultsTab === 'summary'" :class="{active: activeResultsTab === 'summary'}" @click="setResultsTab('summary')">Summary</button>
+        <button type="button" class="results-nav-item" role="tab" :aria-selected="activeResultsTab === 'roundtrips'" :class="{active: activeResultsTab === 'roundtrips'}" @click="setResultsTab('roundtrips')">Round trips</button>
+        <button type="button" class="results-nav-item" role="tab" v-if="dividends.length" :aria-selected="activeResultsTab === 'dividends'" :class="{active: activeResultsTab === 'dividends'}" @click="setResultsTab('dividends')">Dividends</button>
+        <button type="button" class="results-nav-item" role="tab" :aria-selected="activeResultsTab === 'holdings'" :class="{active: activeResultsTab === 'holdings'}" @click="setResultsTab('holdings')">Holdings</button>
+      </nav>
 
-        <div v-if="deposits.length" class="summary-container g2">
-          <h2 class="summary-box-title" style="grid-column: 1 / span 2;"> Deposits </h2>
-          <template v-for="dep in deposits">
-            <div class="summary-item c1">
-              {{getDmyString(dep.timestamp)}}
-            </div>
-            <div class="summary-item c2">
-              {{formatCurrency(dep.value)}}
+      <!-- Summary -->
+      <section v-show="activeResultsTab === 'summary'" id="results-summary" class="results-panel" role="tabpanel" aria-label="Summary">
+        <div class="error-container" v-if="errorList.length > 0" role="alert" aria-live="assertive">
+          <h2 class="summary-box-title">Errors Detected</h2>
+          <p>Errors were found during calculations — normally caused by missing data, stock splits or ticker changes
+            (i.e. SPACs). Fix or understand these before proceeding.</p>
+          <p>It is best to change the raw CSV data for the purchase event to match the disposal event data, then go
+            back, clear and re-load CSV files.</p>
+          <template v-for="error in errorList">
+            <div class="error">
+              <span class="sr-only" v-if="error.msg.includes('Error')">Error:</span>
+              <span class="sr-only" v-else-if="error.msg.includes('Caution')">Caution:</span>
+              <span v-if="error.msg.includes('Error')" class="status-badge status-badge-error" aria-hidden="true">Error</span>
+              <span v-else-if="error.msg.includes('Caution')" class="status-badge status-badge-caution" aria-hidden="true">Caution</span>
+              {{error.msg}}
+              <span v-if="Number(error.linkedUid)">(Go to: <a href="#" @click.prevent="goToError(error.linkedUid)">{{error.linkedUid}}</a>)</span>
             </div>
           </template>
         </div>
 
-        <div v-if="withdrawals.length" class="summary-container g2">
-          <h2 class="summary-box-title" style="grid-column: 1 / span 2;"> Withdrawals </h2>
-          <template v-for="itm in withdrawals">
-            <div class="summary-item c1">
-              {{getDmyString(itm.timestamp)}}
-            </div>
+        <div class="summary-master-container">
+          <div class="summary-container g2">
+            <h2 class="summary-box-title span-2">Tax Year {{fyText}} Summary</h2>
+            <div class="summary-item c1">Disposal Count:</div>
+            <div class="summary-item c2">{{taxYearData.disposals}}</div>
+            <div class="summary-item c1">Disposal Proceeds:</div>
+            <div class="summary-item c2">{{formatCurrency(taxYearData.proceeds)}}</div>
+            <div class="summary-item c1">Total acquisition costs:</div>
+            <div class="summary-item c2">{{formatCurrency(taxYearData.costs)}}</div>
+            <div class="summary-item c1">Total Realised Profit:</div>
+            <div class="summary-item c2"><span class="currency-positive">{{formatCurrency(taxYearData.realisedProfit)}}</span></div>
+            <div class="summary-item c1">Total Realised Loss:</div>
+            <div class="summary-item c2"><span class="currency-negative">{{formatCurrency(taxYearData.realisedLoss)}}</span></div>
+            <div class="summary-item c1">Combined P/L:</div>
             <div class="summary-item c2">
-              {{formatCurrency(itm.value)}}
+              <span :class="currencyClass(taxYearData.realisedProfit - taxYearData.realisedLoss)">{{formatCurrency(taxYearData.realisedProfit - taxYearData.realisedLoss)}}</span>
             </div>
-          </template>
-        </div>
-
-        <div class="summary-container">
-          <h2 class="summary-box-title">Portfolio Allocation</h2>
-          <canvas id="portfolioChart" role="img" aria-label="Pie chart of open portfolio allocation by holding value"></canvas>
-        </div>
-
-        <div class="summary-container">
-          <h2 class="summary-box-title">Monthly Dividend Income</h2>
-          <canvas id="dividendChart" role="img" aria-label="Bar chart of monthly dividend income for the selected tax year"></canvas>
-        </div>
-      </div>
-
-      <div class="round-trip-master-container container">
-        <h2 class="summary-box-title">{{fyText}} Round Trips</h2>
-        <h2 class="centre" style="margin:20px auto;" v-if="!taxYearData.roundTrips.length">No Round Trips Found</h2>
-        <div v-if="taxYearData.roundTrips.length">
-          <div class="centre">
-            <button type="button" class="button btn-secondary" v-on:click="uiRoundTripsExpand = !uiRoundTripsExpand" :aria-expanded="uiRoundTripsExpand">
-              {{uiRoundTripsExpand ? "Hide Round Trips" : "Show Round Trips"}}
-            </button>
+            <div class="summary-item c1">Dividends Received:</div>
+            <div class="summary-item c2">{{formatCurrency(taxYearData.dividends)}}</div>
           </div>
-          <div v-show="uiRoundTripsExpand" class="round-trip-container" style="margin-top: 15px;">
+
+          <div class="summary-container g2">
+            <h2 class="summary-box-title span-2">All Data Summary</h2>
+            <div class="summary-item c1">Disposal Count:</div>
+            <div class="summary-item c2">{{disposalCount}}</div>
+            <div class="summary-item c1">Total Realised Profit:</div>
+            <div class="summary-item c2"><span class="currency-positive">{{formatCurrency(realisedProfit)}}</span></div>
+            <div class="summary-item c1">Total Realised Loss:</div>
+            <div class="summary-item c2"><span class="currency-negative">{{formatCurrency(realisedLoss)}}</span></div>
+            <div class="summary-item c1">Combined P/L:</div>
+            <div class="summary-item c2">
+              <span :class="currencyClass(realisedProfit - realisedLoss)">{{formatCurrency(realisedProfit - realisedLoss)}}</span>
+            </div>
+            <div class="summary-item c1">Unrealised Capital Gain (open positions):</div>
+            <div class="summary-item c2">
+              <span :class="currencyClass(totalUnrealisedGain())">{{formatCurrency(totalUnrealisedGain())}}</span>
+            </div>
+            <div class="summary-item c1">Dividends Received:</div>
+            <div class="summary-item c2">{{formatCurrency(dividendsTotal)}}</div>
+          </div>
+
+          <div v-if="deposits.length" class="summary-container g2">
+            <h2 class="summary-box-title span-2">Deposits</h2>
+            <template v-for="dep in deposits">
+              <div class="summary-item c1">{{getDmyString(dep.timestamp)}}</div>
+              <div class="summary-item c2">{{formatCurrency(dep.value)}}</div>
+            </template>
+          </div>
+
+          <div v-if="withdrawals.length" class="summary-container g2">
+            <h2 class="summary-box-title span-2">Withdrawals</h2>
+            <template v-for="itm in withdrawals">
+              <div class="summary-item c1">{{getDmyString(itm.timestamp)}}</div>
+              <div class="summary-item c2">{{formatCurrency(itm.value)}}</div>
+            </template>
+          </div>
+
+          <div class="summary-container">
+            <h2 class="summary-box-title">Portfolio Allocation</h2>
+            <p class="chart-note">Open holdings as at the end of {{fyText}} (5 April)</p>
+            <canvas id="portfolioChart" role="img" aria-label="Pie chart of open portfolio allocation by holding value at the end of the selected tax year"></canvas>
+          </div>
+
+          <div class="summary-container">
+            <h2 class="summary-box-title">Monthly Dividend Income</h2>
+            <p class="chart-note">Dividends received in the selected tax year ({{fyText}}).</p>
+            <canvas id="dividendChart" role="img" aria-label="Bar chart of monthly dividend income for the selected tax year"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- Round trips -->
+      <section v-show="activeResultsTab === 'roundtrips'" id="results-roundtrips" class="results-panel" role="tabpanel" aria-label="Round trips">
+        <div class="round-trip-master-container">
+          <h2 class="summary-box-title">{{fyText}} Round Trips</h2>
+          <p class="centre mt-md" v-if="!taxYearData.roundTrips.length">No round trips found for this tax year.</p>
+          <div v-if="taxYearData.roundTrips.length" class="round-trip-container round-trips-panel">
             <h5 class="ledger-entry c1">Date Sold</h5>
             <h5 class="ledger-entry c2">Date Aquired</h5>
             <h5 class="ledger-entry c3">Asset</h5>
@@ -456,189 +412,198 @@
             <button type="button" class="download-button" v-on:click="downloadRoundTrips()">Download Round Trip CSV</button>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div v-if="dividends.length" class="dividends-container container">
-        <h2 class="summary-box-title">Dividends</h2>
-        
-        <div class="summary-container g2" style="max-width: 500px; margin: 0 auto 30px auto;">
-          <h2 class="summary-box-title" style="grid-column: 1 / span 2; border-bottom: none; margin-bottom: 5px;">Tax Year {{fyText}} Summary</h2>
-          <div class="summary-item c1">UK Companies Total:</div>
-          <div class="summary-item c2">£{{divTyUkC}}</div>
-          <div class="summary-item c1">UK Other (Funds/Trusts) Total:</div>
-          <div class="summary-item c2">£{{divTyUkO}}</div>
-          <div class="summary-item c1">Foreign Total:</div>
-          <div class="summary-item c2">£{{dividendDetails.nonUk.toFixed(2)}}</div>
-          <div class="summary-item c1">Foreign Taxes Paid:</div>
-          <div class="summary-item c2">£{{dividendDetails.taxPaid.toFixed(2)}}</div>
-        </div>
+      <!-- Dividends -->
+      <section v-show="activeResultsTab === 'dividends'" id="results-dividends" class="results-panel" role="tabpanel" aria-label="Dividends">
+        <div class="dividends-container">
+          <h2 class="summary-box-title">Dividends</h2>
+          <p class="chart-note">Dividends from UK-listed funds, trusts, and other non-company sources may appear under UK Company Dividends by default. Untick <strong>UK Company?</strong> for those rows so they move to Other UK Dividends and the tax-year totals stay correct.</p>
 
-        <h4 class="summary-box-subheading">UK Company Dividends</h4>
-        <div class="dividend-table">
-          <h5 class="ledger-entry c1">Date Received</h5>
-          <h5 class="ledger-entry c2">Name</h5>
-          <h5 class="ledger-entry c3">Value</h5>
-          <h5 class="ledger-entry c4" title="Is the dividend from a UK company or is it from a UK Trust/Fund/Other">UK Company?</h5>
-          <template v-for="itm in dividends">
-            <span v-if="itm.isUk && itm.ukCompany" class="ledger-entry c1">
-              {{getDmyString(itm.timestamp)}} <span v-if="itm.inTaxYear" style="color: var(--brand); font-weight: bold; margin-left: 5px;">*</span>
-            </span>
-            <span v-if="itm.isUk && itm.ukCompany" class="ledger-entry c2">{{itm.name}} ({{itm.ticker}})</span>
-            <span v-if="itm.isUk && itm.ukCompany" class="ledger-entry c3">£{{itm.value.toFixed(2)}}</span>
-            <span v-if="itm.isUk && itm.ukCompany" class="ledger-entry c4" style="justify-content: center;">
-              <input type="checkbox" v-model="itm.ukCompany" style="cursor: pointer; transform: scale(1.3);">
-            </span>
-          </template>
-        </div>
-
-        <h4 class="summary-box-subheading">Other UK Dividends</h4>
-        <div class="dividend-table">
-          <h5 class="ledger-entry c1">Date Received</h5>
-          <h5 class="ledger-entry c2">Name</h5>
-          <h5 class="ledger-entry c3">Value</h5>
-          <h5 class="ledger-entry c4" title="Is the dividend from a UK company or is it from a UK Trust/Fund/Other">UK Company?</h5>
-          <template v-for="itm in dividends">
-            <span v-if="itm.isUk && !itm.ukCompany" class="ledger-entry c1">
-              {{getDmyString(itm.timestamp)}} <span v-if="itm.inTaxYear" style="color: var(--brand); font-weight: bold; margin-left: 5px;">*</span>
-            </span>
-            <span v-if="itm.isUk && !itm.ukCompany" class="ledger-entry c2">{{itm.name}} ({{itm.ticker}})</span>
-            <span v-if="itm.isUk && !itm.ukCompany" class="ledger-entry c3">£{{itm.value.toFixed(2)}}</span>
-            <span v-if="itm.isUk && !itm.ukCompany" class="ledger-entry c4" style="justify-content: center;">
-              <input type="checkbox" v-model="itm.ukCompany" style="cursor: pointer; transform: scale(1.3);">
-            </span>
-          </template>
-        </div>
-
-        <h4 class="summary-box-subheading">Non-UK Dividends</h4>
-        <div class="dividend-table">
-          <h5 class="ledger-entry c1">Date Received</h5>
-          <h5 class="ledger-entry c2">Name</h5>
-          <h5 class="ledger-entry c3">Value</h5>
-          <h5 class="ledger-entry c4">Tax Paid</h5>
-          <template v-for="itm in dividends">
-            <span v-if="!itm.isUk" class="ledger-entry c1">
-              {{getDmyString(itm.timestamp)}} <span v-if="itm.inTaxYear" style="color: var(--brand); font-weight: bold; margin-left: 5px;">*</span>
-            </span>
-            <span v-if="!itm.isUk" class="ledger-entry c2">{{itm.name}} ({{itm.ticker}})</span>
-            <span v-if="!itm.isUk" class="ledger-entry c3">£{{itm.value.toFixed(2)}}</span>
-            <span v-if="!itm.isUk" class="ledger-entry c4" :title="`Paid ${itm.taxPaid}${itm.taxCurrency} @ ${itm.exchangeRate.toFixed(2)}${itm.taxCurrency}/GBP`">
-              £{{itm.taxPaidGBP.toFixed(2)}}
-            </span>
-          </template>
-        </div>
-        <div style="font-size:0.8em; margin-top:10px; color: var(--text-secondary);"><strong>*</strong> = Included in {{fyText}} Tax Year</div>
-      </div>
-
-      <div class="holdings-master-container">
-        <h2 class="section-title centre">All Holdings</h2>
-        <div class="centre button-row">
-          <button type="button" class="button btn-secondary" v-on:click="uiAllHoldings(1)">Expand All Holdings</button>
-          <button type="button" class="button btn-secondary" v-on:click="uiAllHoldings(0)">Collapse All Holdings</button>
-          <button type="button" class="button btn-secondary" :aria-pressed="showErrorsOnly" v-on:click="toggleErrorFilter()">{{showErrorsOnly ? "Show All Holdings" : "Show Errors Only"}}</button>
-        </div>
-
-        <template v-for="inst in filteredHoldings">
-          <div class="holding">
-            <div :title="`ISIN: ${inst.isin}`" class="holding-title"><strong>{{inst.name}} ({{inst.ticker}})</strong>
-              <span v-if="holdingHasErrors(inst)" class="holding-warning" title="This holding is linked to warnings"><span class="sr-only">Has calculation warnings.</span><span aria-hidden="true">⚠️</span></span>
-            </div>
-            
-            <div v-show="!inst.uiExpand" class="g4 collapsed-holding-summary">
-              <div class="r1 c1" style="font-weight: bold;">Total Realised Profit </div>
-              <div class="r1 c2" style="font-weight: bold;">{{fyText}} Realised Profit</div>
-              <div class="r1 c3" style="font-weight: bold;"> Trades </div>
-              <div class="r1 c4" style="font-weight: bold;"> Open Position</div>
-              <div class="r2 c1">£{{inst.realisedPl.toFixed(2)}} </div>
-              <div class="r2 c2">£{{(inst.tyData.realisedProfit - inst.tyData.realisedLoss).toFixed(2)}}</div>
-              <div class="r2 c3"> {{inst.tradeCount}} </div>
-              <div class="r2 c4"> {{inst.holdings.toFixed(2)}}</div>
-            </div>
-
-            <div v-show="inst.uiExpand" class="g5">
-              <h4 class="summary-box-subheading" style="grid-column: 1 / span 5;">All Data Summary</h4>
-              <h5 class="c1">Open Position</h5>
-              <h5 class="c2">Trade Count</h5>
-              <h5 class="c3">Total Gain GBP</h5>
-              <div class="c1" style="grid-column: 1; grid-row: 3;">{{inst.holdings.toFixed(2)}}</div>
-              <div class="c2" style="grid-column: 2; grid-row: 3;">{{inst.tradeCount}}</div>
-              <div class="c3" style="grid-column: 3; grid-row: 3;">{{inst.realisedPl.toFixed(2)}}</div>
-              
-              <h4 class="summary-box-subheading" style="grid-column: 1 / span 5; margin-top: 15px;">Tax Year Summary</h4>
-              <h5 class="c1">Disposal Count</h5>
-              <h5 class="c2">Realised Profit GBP</h5>
-              <h5 class="c3">Realised Loss GBP</h5>
-              <h5 class="c4">Overall Gain GBP</h5>
-              <div class="c1" style="grid-column: 1; grid-row: 6;">{{inst.tyData.disposalCount}}</div>
-              <div class="c2" style="grid-column: 2; grid-row: 6;">{{inst.tyData.realisedProfit.toFixed(2)}}</div>
-              <div class="c3" style="grid-column: 3; grid-row: 6;">{{inst.tyData.realisedLoss.toFixed(2)}}</div>
-              <div class="c4" style="grid-column: 4; grid-row: 6;">{{(inst.tyData.realisedProfit - inst.tyData.realisedLoss).toFixed(2)}}</div>
-            </div>
-
-            <h4 v-show="inst.uiExpand" class="summary-box-subheading" style="margin-top: 20px;">Trade Log</h4>
-            <div v-show="inst.uiExpand" class="trade-container">
-              <h5 class="ledger-entry c1">ID</h5>
-              <h5 class="ledger-entry c2">Date</h5>
-              <h5 class="ledger-entry c3">Type</h5>
-              <h5 class="ledger-entry c4"># Shares</h5>
-              <h5 class="ledger-entry c5">Price GBP</h5>
-              <h5 class="ledger-entry c6">Total GBP</h5>
-              <template v-for="t,key in inst.trades">
-                <span v-bind:class="getTradeClass(t.rawType)" class="ledger-entry c1">{{t.uid}}</span>
-                <span v-bind:class="getTradeClass(t.rawType)" class="ledger-entry c2">{{getDmyString(t.timestamp)}}</span>
-                <span v-bind:class="getTradeClass(t.rawType)" class="ledger-entry c3">{{t.rawType}}</span>
-                <span v-bind:class="getTradeClass(t.rawType)" class="ledger-entry c4">{{t.number}}</span>
-                <span v-bind:class="getTradeClass(t.rawType)" class="ledger-entry c5">{{t.priceGBP.toFixed(2)}}</span>
-                <span v-bind:class="getTradeClass(t.rawType)" class="ledger-entry c6">{{t.total.toFixed(2)}}</span>
-              </template>
-            </div>
-
-            <h4 v-show="inst.uiExpand" class="summary-box-subheading" style="margin-top: 20px;">Calculation Ledger</h4>
-            <div v-show="inst.uiExpand" class="disposal-container">
-              <h5 class="ledger-entry ledger-uid">ID</h5>
-              <h5 class="ledger-entry ledger-date">Date</h5>
-              <h5 class="ledger-entry ledger-change">Change</h5>
-              <h5 class="ledger-entry ledger-price">Price £</h5>
-              <h5 class="ledger-entry ledger-gain">Gain £</h5>
-              <h5 class="ledger-entry ledger-loss">Loss £</h5>
-              <h5 class="ledger-entry ledger-s104t">S104 Holdings</h5>
-              <h5 class="ledger-entry ledger-s104p">S104 Price</h5>
-              <h5 class="ledger-entry ledger-comment">Comment</h5>
-              <template v-for="d in inst.ledger">
-                <span v-bind:class="getTradeClass(d.change)" v-bind:id="d.uid" class="ledger-entry ledger-uid">{{d.uid}}</span>
-                <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-date">{{getDmyString(d.timestamp)}}</span>
-                <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-change">{{d.change.toFixed(2)}}</span>
-                <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-price">{{d.price.toFixed(2)}}</span>
-                <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-gain">{{d.gain.toFixed(2)}}</span>
-                <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-loss">{{d.loss.toFixed(2)}}</span>
-                <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-s104t">{{d.s104Total.toFixed(2)}}</span>
-                <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-s104p">{{d.s104Price.toFixed(2)}}</span>
-                <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-comment">
-                  <template v-for="comm in d.comment">
-                    <p style="margin: 0;">{{comm}}</p>
-                  </template>
-                </span>
-              </template>
-            </div>
-
-            <button type="button" class="holding-expand-button" :aria-expanded="!!inst.uiExpand" v-on:click="inst.uiExpand = !inst.uiExpand">
-              {{inst.uiExpand ? "Hide Details" : "Show Details"}}
-            </button>
+          <div class="summary-container g2 dividend-summary-box">
+            <h2 class="summary-box-title span-2 no-border">Tax Year {{fyText}} Summary</h2>
+            <div class="summary-item c1">UK Companies Total:</div>
+            <div class="summary-item c2">£{{divTyUkC}}</div>
+            <div class="summary-item c1">UK Other (Funds/Trusts) Total:</div>
+            <div class="summary-item c2">£{{divTyUkO}}</div>
+            <div class="summary-item c1">Foreign Total:</div>
+            <div class="summary-item c2">£{{dividendDetails.nonUk.toFixed(2)}}</div>
+            <div class="summary-item c1">Foreign Taxes Paid:</div>
+            <div class="summary-item c2">£{{dividendDetails.taxPaid.toFixed(2)}}</div>
           </div>
-        </template>
-      </div>
+
+          <div class="dividend-filter" role="group" aria-label="Dividend list filter">
+            <span class="settings-label">Show</span>
+            <button type="button" class="button btn-compact" :class="dividendListFilter === 'taxYear' ? 'btn-primary' : 'btn-secondary'" :aria-pressed="dividendListFilter === 'taxYear'" @click="dividendListFilter = 'taxYear'">{{fyText}} only</button>
+            <button type="button" class="button btn-compact" :class="dividendListFilter === 'all' ? 'btn-primary' : 'btn-secondary'" :aria-pressed="dividendListFilter === 'all'" @click="dividendListFilter = 'all'">All data</button>
+          </div>
+
+          <h4 class="summary-box-subheading">UK Company Dividends</h4>
+          <div class="dividend-table">
+            <h5 class="ledger-entry c1">Date Received</h5>
+            <h5 class="ledger-entry c2">Name</h5>
+            <h5 class="ledger-entry c3">Value</h5>
+            <h5 class="ledger-entry c4" title="Is the dividend from a UK company or is it from a UK Trust/Fund/Other">UK Company?</h5>
+            <template v-for="itm in listedUkCompanyDividends">
+              <span class="ledger-entry c1">
+                {{getDmyString(itm.timestamp)}} <span v-if="dividendListFilter === 'all' && itm.inTaxYear" class="ty-marker">*</span>
+              </span>
+              <span class="ledger-entry c2">{{itm.name}} ({{itm.ticker}})</span>
+              <span class="ledger-entry c3">£{{itm.value.toFixed(2)}}</span>
+              <span class="ledger-entry c4 justify-center">
+                <input type="checkbox" class="checkbox-lg" v-model="itm.ukCompany">
+              </span>
+            </template>
+          </div>
+          <p v-if="!listedUkCompanyDividends.length" class="chart-note">No UK company dividends in this view.</p>
+
+          <h4 class="summary-box-subheading">Other UK Dividends</h4>
+          <div class="dividend-table">
+            <h5 class="ledger-entry c1">Date Received</h5>
+            <h5 class="ledger-entry c2">Name</h5>
+            <h5 class="ledger-entry c3">Value</h5>
+            <h5 class="ledger-entry c4" title="Is the dividend from a UK company or is it from a UK Trust/Fund/Other">UK Company?</h5>
+            <template v-for="itm in listedUkOtherDividends">
+              <span class="ledger-entry c1">
+                {{getDmyString(itm.timestamp)}} <span v-if="dividendListFilter === 'all' && itm.inTaxYear" class="ty-marker">*</span>
+              </span>
+              <span class="ledger-entry c2">{{itm.name}} ({{itm.ticker}})</span>
+              <span class="ledger-entry c3">£{{itm.value.toFixed(2)}}</span>
+              <span class="ledger-entry c4 justify-center">
+                <input type="checkbox" class="checkbox-lg" v-model="itm.ukCompany">
+              </span>
+            </template>
+          </div>
+          <p v-if="!listedUkOtherDividends.length" class="chart-note">No other UK dividends in this view.</p>
+
+          <h4 class="summary-box-subheading">Non-UK Dividends</h4>
+          <div class="dividend-table">
+            <h5 class="ledger-entry c1">Date Received</h5>
+            <h5 class="ledger-entry c2">Name</h5>
+            <h5 class="ledger-entry c3">Value</h5>
+            <h5 class="ledger-entry c4">Tax Paid</h5>
+            <template v-for="itm in listedNonUkDividends">
+              <span class="ledger-entry c1">
+                {{getDmyString(itm.timestamp)}} <span v-if="dividendListFilter === 'all' && itm.inTaxYear" class="ty-marker">*</span>
+              </span>
+              <span class="ledger-entry c2">{{itm.name}} ({{itm.ticker}})</span>
+              <span class="ledger-entry c3">£{{itm.value.toFixed(2)}}</span>
+              <span class="ledger-entry c4" :title="`Paid ${itm.taxPaid}${itm.taxCurrency} @ ${itm.exchangeRate.toFixed(2)}${itm.taxCurrency}/GBP`">
+                £{{itm.taxPaidGBP.toFixed(2)}}
+              </span>
+            </template>
+          </div>
+          <p v-if="!listedNonUkDividends.length" class="chart-note">No non-UK dividends in this view.</p>
+          <div v-if="dividendListFilter === 'all'" class="legend-note"><strong>*</strong> = Included in {{fyText}} Tax Year</div>
+        </div>
+      </section>
+
+      <!-- Holdings -->
+      <section v-show="activeResultsTab === 'holdings'" id="results-holdings" class="results-panel" role="tabpanel" aria-label="Holdings">
+        <div class="holdings-master-container">
+          <h2 class="section-title">All Holdings</h2>
+          <div class="centre button-row">
+            <button type="button" class="button btn-secondary" v-on:click="uiAllHoldings(1)">Expand All</button>
+            <button type="button" class="button btn-secondary" v-on:click="uiAllHoldings(0)">Collapse All</button>
+            <button type="button" class="button btn-secondary" :aria-pressed="showErrorsOnly" v-on:click="toggleErrorFilter()">{{showErrorsOnly ? "Show All" : "Show Errors Only"}}</button>
+          </div>
+
+          <template v-for="inst in filteredHoldings">
+            <div class="holding">
+              <div :title="`ISIN: ${inst.isin}`" class="holding-title"><strong>{{inst.name}} ({{inst.ticker}})</strong>
+                <span v-if="holdingHasErrors(inst)" class="holding-warning" title="This holding is linked to warnings"><span class="sr-only">Has calculation warnings.</span>Warn</span>
+              </div>
+
+              <div v-show="!inst.uiExpand" class="g4 collapsed-holding-summary">
+                <div class="r1 c1 holding-metric-label">Total Realised Profit</div>
+                <div class="r1 c2 holding-metric-label">{{fyText}} Realised Profit</div>
+                <div class="r1 c3 holding-metric-label">Trades</div>
+                <div class="r1 c4 holding-metric-label">Open Position</div>
+                <div class="r2 c1">£{{inst.realisedPl.toFixed(2)}}</div>
+                <div class="r2 c2">£{{(inst.tyData.realisedProfit - inst.tyData.realisedLoss).toFixed(2)}}</div>
+                <div class="r2 c3">{{inst.tradeCount}}</div>
+                <div class="r2 c4">{{inst.holdings.toFixed(2)}}</div>
+              </div>
+
+              <div v-show="inst.uiExpand" class="g5">
+                <h4 class="summary-box-subheading holding-summary-span">All Data Summary</h4>
+                <h5 class="c1">Open Position</h5>
+                <h5 class="c2">Trade Count</h5>
+                <h5 class="c3">Total Gain GBP</h5>
+                <div class="cell-r3-c1">{{inst.holdings.toFixed(2)}}</div>
+                <div class="cell-r3-c2">{{inst.tradeCount}}</div>
+                <div class="cell-r3-c3">{{inst.realisedPl.toFixed(2)}}</div>
+
+                <h4 class="summary-box-subheading holding-summary-span spaced">Tax Year Summary</h4>
+                <h5 class="c1">Disposal Count</h5>
+                <h5 class="c2">Realised Profit GBP</h5>
+                <h5 class="c3">Realised Loss GBP</h5>
+                <h5 class="c4">Overall Gain GBP</h5>
+                <div class="cell-r6-c1">{{inst.tyData.disposalCount}}</div>
+                <div class="cell-r6-c2">{{inst.tyData.realisedProfit.toFixed(2)}}</div>
+                <div class="cell-r6-c3">{{inst.tyData.realisedLoss.toFixed(2)}}</div>
+                <div class="cell-r6-c4">{{(inst.tyData.realisedProfit - inst.tyData.realisedLoss).toFixed(2)}}</div>
+              </div>
+
+              <h4 v-show="inst.uiExpand" class="summary-box-subheading mt-md">Trade Log</h4>
+              <div v-show="inst.uiExpand" class="trade-container">
+                <h5 class="ledger-entry c1">ID</h5>
+                <h5 class="ledger-entry c2">Date</h5>
+                <h5 class="ledger-entry c3">Type</h5>
+                <h5 class="ledger-entry c4"># Shares</h5>
+                <h5 class="ledger-entry c5">Price GBP</h5>
+                <h5 class="ledger-entry c6">Total GBP</h5>
+                <template v-for="t,key in inst.trades">
+                  <span v-bind:class="getTradeClass(t.rawType)" class="ledger-entry c1">{{t.uid}}</span>
+                  <span v-bind:class="getTradeClass(t.rawType)" class="ledger-entry c2">{{getDmyString(t.timestamp)}}</span>
+                  <span v-bind:class="getTradeClass(t.rawType)" class="ledger-entry c3">{{t.rawType}}</span>
+                  <span v-bind:class="getTradeClass(t.rawType)" class="ledger-entry c4">{{t.number}}</span>
+                  <span v-bind:class="getTradeClass(t.rawType)" class="ledger-entry c5">{{t.priceGBP.toFixed(2)}}</span>
+                  <span v-bind:class="getTradeClass(t.rawType)" class="ledger-entry c6">{{t.total.toFixed(2)}}</span>
+                </template>
+              </div>
+
+              <h4 v-show="inst.uiExpand" class="summary-box-subheading mt-md">Calculation Ledger</h4>
+              <div v-show="inst.uiExpand" class="disposal-container">
+                <h5 class="ledger-entry ledger-uid">ID</h5>
+                <h5 class="ledger-entry ledger-date">Date</h5>
+                <h5 class="ledger-entry ledger-change">Change</h5>
+                <h5 class="ledger-entry ledger-price">Price £</h5>
+                <h5 class="ledger-entry ledger-gain">Gain £</h5>
+                <h5 class="ledger-entry ledger-loss">Loss £</h5>
+                <h5 class="ledger-entry ledger-s104t">S104 Holdings</h5>
+                <h5 class="ledger-entry ledger-s104p">S104 Price</h5>
+                <h5 class="ledger-entry ledger-comment">Comment</h5>
+                <template v-for="d in inst.ledger">
+                  <span v-bind:class="getTradeClass(d.change)" v-bind:id="d.uid" class="ledger-entry ledger-uid">{{d.uid}}</span>
+                  <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-date">{{getDmyString(d.timestamp)}}</span>
+                  <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-change">{{d.change.toFixed(2)}}</span>
+                  <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-price">{{d.price.toFixed(2)}}</span>
+                  <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-gain">{{d.gain.toFixed(2)}}</span>
+                  <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-loss">{{d.loss.toFixed(2)}}</span>
+                  <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-s104t">{{d.s104Total.toFixed(2)}}</span>
+                  <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-s104p">{{d.s104Price.toFixed(2)}}</span>
+                  <span v-bind:class="getTradeClass(d.change)" class="ledger-entry ledger-comment">
+                    <template v-for="comm in d.comment">
+                      <p class="ledger-comment-line">{{comm}}</p>
+                    </template>
+                  </span>
+                </template>
+              </div>
+
+              <button type="button" class="holding-expand-button" :aria-expanded="!!inst.uiExpand" v-on:click="inst.uiExpand = !inst.uiExpand">
+                {{inst.uiExpand ? "Hide Details" : "Show Details"}}
+              </button>
+            </div>
+          </template>
+        </div>
+      </section>
     </div>
     </main>
 
-    <div style="height:40px"></div>
-    <div style="margin:0 40px">
-      <p class="centre">THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-        IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-        FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-        AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-        LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-        OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-        SOFTWARE.</p>
-    </div>
+    <footer class="site-footer">
+      <p>This software is provided “as is”, without warranty of any kind. Calculations may only be used for tax purposes after they have been checked for accuracy and completeness by yourself or your tax advisor.</p>
+    </footer>
   </div>
   <script type='text/javascript' src="Scripts/script.js"></script>
 </body>

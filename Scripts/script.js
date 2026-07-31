@@ -36,8 +36,7 @@
           type: "",
           message: ""
         },
-        activeStep: 1,
-        activeInputTab: 'csv',
+        activeInputTab: 'manual',
         manualTradeForm: { date: '', action: 'Buy', ticker: '', name: '', shares: '', price: '' },
         manualTrades: [],
         corpActionForm: { type: 'Split', date: '', ticker: '', ratio: '', newTicker: '', newName: '' },
@@ -48,8 +47,9 @@
         exportError: "",
         showHowItWorks: false,
         isDraggingFile: false,
-        activeResultsTab: "dashboard",
+        activeResultsTab: "summary",
         showErrorsOnly: false,
+        dividendListFilter: "taxYear",
         uiRoundTripsExpand: false,
         portfolioChart: null,
         dividendChart: null,
@@ -127,23 +127,6 @@
             this.bnbResidenceMode = this.bnbNonResidentPeriods.length ? 'periods' : 'always';
           }
         });
-
-        // Set up the Intersection Observer to dynamically highlight the stepper
-        this.$nextTick(() => {
-          const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-              if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
-                if (entry.target.id === 'step1') this.activeStep = 1;
-                if (entry.target.id === 'step2') this.activeStep = 2;
-                if (entry.target.id === 'step3') this.activeStep = 3;
-              }
-            });
-          }, { threshold: 0.5 });
-          
-          if(document.getElementById('step1')) observer.observe(document.getElementById('step1'));
-          if(document.getElementById('step2')) observer.observe(document.getElementById('step2'));
-          if(document.getElementById('step3')) observer.observe(document.getElementById('step3'));
-        });
       },
       computed: {
         availableTickers: function() {
@@ -220,6 +203,16 @@
           }
           return (sum.toFixed(2));
 
+        },
+        // Dividends visible in the list tables (tax year only or full history)
+        listedUkCompanyDividends: function () {
+          return this.dividends.filter(d => d.isUk && d.ukCompany && this.showDividendInList(d));
+        },
+        listedUkOtherDividends: function () {
+          return this.dividends.filter(d => d.isUk && !d.ukCompany && this.showDividendInList(d));
+        },
+        listedNonUkDividends: function () {
+          return this.dividends.filter(d => !d.isUk && this.showDividendInList(d));
         }
       },
       methods: {
@@ -227,6 +220,9 @@
         safeSub(a, b) { return new Decimal(a || 0).minus(b || 0).toNumber(); },
         safeMult(a, b) { return new Decimal(a || 0).times(b || 0).toNumber(); },
         safeDiv(a, b) { if (Number(b) === 0) return 0; return new Decimal(a || 0).div(b).toNumber(); },
+        showDividendInList(itm) {
+          return this.dividendListFilter === "all" || !!itm.inTaxYear;
+        },
         autoFillManualName() {
           let found = this.availableTickers.find(t => t.ticker === this.manualTradeForm.ticker);
           if (found && !this.manualTradeForm.name) {
@@ -462,17 +458,16 @@
             return;
           }
 
+          // Ensure tax-year bounds are current before snapshotting holdings
+          this.setTaxYearBounds(this.taxYear.target);
+
           const labels = [];
           const values = [];
           for (let key in this.holdings) {
-            const h = this.holdings[key];
-            if (Number(h.holdings) > 0) {
-              const price = (h.ledger || []).length ? Number(h.ledger[h.ledger.length - 1].price || 0) : 0;
-              const value = Number(h.holdings || 0) * price;
-              if (value > 0) {
-                labels.push(h.ticker || h.name);
-                values.push(value);
-              }
+            const snapshot = this.holdingValueAtTaxYearEnd(this.holdings[key]);
+            if (snapshot) {
+              labels.push(snapshot.ticker);
+              values.push(snapshot.value);
             }
           }
 
@@ -488,20 +483,92 @@
           if (this.portfolioChart) this.portfolioChart.destroy();
           if (this.dividendChart) this.dividendChart.destroy();
 
+          // Distinct hues so holdings stay separable (greyscale slices were blending together)
+          const chartPalette = [
+            '#2563eb', '#0891b2', '#059669', '#ca8a04', '#ea580c',
+            '#db2777', '#7c3aed', '#0d9488', '#4f46e5', '#65a30d',
+            '#dc2626', '#0284c7', '#9333ea', '#c2410c', '#0f766e'
+          ];
+          const pieColors = labels.map((_, i) => chartPalette[i % chartPalette.length]);
+
           this.portfolioChart = new Chart(portfolioCanvas, {
             type: 'pie',
-            data: { labels, datasets: [{ data: values }] },
-            options: { plugins: { legend: { position: 'bottom' } } }
+            data: {
+              labels,
+              datasets: [{
+                data: values,
+                backgroundColor: pieColors,
+                borderColor: '#ffffff',
+                borderWidth: 2
+              }]
+            },
+            options: {
+              plugins: {
+                legend: {
+                  position: 'bottom',
+                  labels: { boxWidth: 12, padding: 12 }
+                }
+              }
+            }
           });
 
           this.dividendChart = new Chart(dividendCanvas, {
             type: 'bar',
             data: {
               labels: Object.keys(monthly).sort(),
-              datasets: [{ label: 'Dividends (£)', data: Object.keys(monthly).sort().map(k => monthly[k]), backgroundColor: '#40916C' }]
+              datasets: [{
+                label: 'Dividends (£)',
+                data: Object.keys(monthly).sort().map(k => monthly[k]),
+                backgroundColor: '#2563eb',
+                borderRadius: 2
+              }]
             },
             options: { scales: { y: { beginAtZero: true } } }
           });
+        },
+        /**
+         * @brief Open quantity and value for a holding as at the end of the selected tax year.
+         * @param {object} holding Holding with chronological trades.
+         * @returns {{ticker: string, qty: number, price: number, value: number}|null} Snapshot, or null when flat/zero.
+         */
+        holdingValueAtTaxYearEnd(holding) {
+          if (!holding || !holding.trades || !holding.trades.length) {
+            return null;
+          }
+
+          const yearEnd = this.taxYear.end;
+          let qty = 0;
+          let lastPrice = 0;
+
+          // Trades are sorted ascending; accumulate net shares up to and including 5 April
+          for (let i = 0; i < holding.trades.length; i++) {
+            const trade = holding.trades[i];
+            if (isNaN(trade.timestamp) || trade.timestamp > yearEnd) {
+              break;
+            }
+
+            if (trade.rawType === "Buy") {
+              qty = this.safeAdd(qty, trade.number);
+            } else {
+              qty = this.safeSub(qty, trade.number);
+            }
+
+            const price = Number(trade.priceGBP || trade.price || 0);
+            if (price > 0) {
+              lastPrice = price;
+            }
+          }
+
+          if (qty <= 0 || lastPrice <= 0) {
+            return null;
+          }
+
+          return {
+            ticker: holding.ticker || holding.name,
+            qty: qty,
+            price: lastPrice,
+            value: this.safeMult(qty, lastPrice)
+          };
         },
         hasRequiredTradeHeaders(parsedRows) {
           if (!parsedRows || !parsedRows.length) {
@@ -520,7 +587,18 @@
         //UI Functions:
         back() {
           this.calculated = 0;
+          this.activeResultsTab = "summary";
           this.resetCalculations();
+        },
+        setResultsTab(tab) {
+          this.activeResultsTab = tab;
+          if (tab === "roundtrips") {
+            this.uiRoundTripsExpand = true;
+          }
+          // Re-render charts when returning to summary (canvas may have been hidden)
+          if (tab === "summary") {
+            this.$nextTick(() => this.renderCharts());
+          }
         },
         removeFile(fileName) {
           if (!fileName) {
@@ -814,6 +892,8 @@
         },
         goToError(uid) {
           uid = Number(uid);
+          // Jump to holdings panel so the ledger row is visible
+          this.setResultsTab("holdings");
           for (let key in this.holdings) {
             let holding = this.holdings[key];
             if (holding.ledger && holding.ledger.some(entry => entry.uid === uid)) {
@@ -1150,6 +1230,7 @@
 
           t.calculating = 0;
           t.calculated = 1;
+          t.activeResultsTab = "summary";
 
           t.$nextTick(() => {
             t.renderCharts();
@@ -1204,7 +1285,7 @@
             value: Number(this.getTradeValue(trade, "totalGbp", 10)),
             isUk: this.getTradeValue(trade, "currencyPricePerShare", 7) === "GBX" ? 1 : 0,
             taxCurrency: this.getTradeValue(trade, "currencyPricePerShare", 7),
-            taxPaid: this.getTradeValue(trade, "withholdingTax", 11),
+            taxPaid: this.getNumber(this.getTradeValue(trade, "withholdingTax", 11)),
             taxPaidGBP: 0,
             exchangeRate: 0,
             ukCompany: 1, 
@@ -1217,10 +1298,17 @@
 
           if (!temp.isUk) {
             if (temp.inTaxYear) this.dividendDetails.nonUk += temp.value;
-            if (this.getNumber(this.getTradeValue(trade, "withholdingTax", 11)) > 0) {
-              let exRate = ((this.getNumber(this.getTradeValue(trade, "numberOfShares", 5)) * this.getNumber(this.getTradeValue(trade, "pricePerShare", 6))) - this.getNumber(this.getTradeValue(trade, "withholdingTax", 11))) / this.getNumber(this.getTradeValue(trade, "withholdingTax", 11));
-              temp.taxPaidGBP = this.getNumber(this.getTradeValue(trade, "withholdingTax", 11)) * exRate;
-              temp.exchangeRate = exRate;
+            // Convert withholding (foreign currency) to GBP using T212 FX convention
+            if (temp.taxPaid > 0) {
+              const fx = TaxMath.foreignWithholdingTaxGbp(
+                this.getNumber(this.getTradeValue(trade, "numberOfShares", 5)),
+                this.getNumber(this.getTradeValue(trade, "pricePerShare", 6)),
+                temp.taxPaid,
+                temp.value,
+                this.getNumber(this.getTradeValue(trade, "exchangeRate", 8))
+              );
+              temp.taxPaidGBP = fx.taxPaidGBP;
+              temp.exchangeRate = fx.exchangeRate;
               if (temp.inTaxYear) this.dividendDetails.taxPaid += temp.taxPaidGBP;
             }
           } else { 
